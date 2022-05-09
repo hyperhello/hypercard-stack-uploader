@@ -4,20 +4,20 @@
 	
 	LICENSE:
 	This file was developed ©2022 Hypervariety Custom Software, LLC. There is no warranty of any kind expressed or implied.
+	THIS FILE IS OPEN SOURCE. YOU CAN COPY AND RUN THIS FILE YOURSELF AND LEARN PROGRAMMING TECHNIQUES FROM IT.
 	Although the code is not very well-written or pretty, in the interests of public discourse, I am making it available for view. 
-
+	
+	THANK YOU TO THE RETRO-HACKERS WHO FIGURED OUT THE HC STACK FORMAT.
+	https://hypercard.org/hypercard_file_format_pierre/
+	https://github.com/PierreLorenzi/HyperCardPreview/blob/master/StackFormat.md
+	
 	This php script shows a form that lets the user upload HyperCard 1.x or 2.x stacks. 
 	If installed, it uses Maconv to get it out of a StuffIt archive, .dsk, or .img file.
 	It translates the stack to a big JSON with mostly proper HC property names. 
 	Then at the end, depending on the flag it either shows the JSON, sends it to the parent window, or puts the stack up on display.
 	
-	I also want to thank the retro-hackers who figured out the HC stack format.
-	https://hypercard.org/hypercard_file_format_pierre/
-	https://github.com/PierreLorenzi/HyperCardPreview/blob/master/StackFormat.md
-	
 */
 	
-
 $show_errors = true;
 ini_set('display_errors', $show_errors ? 1 : 0);
 error_reporting($show_errors ? -1 : 0); 	// this is really hard core, in PHP 8 it's the default
@@ -26,12 +26,18 @@ header('Content-Type: text/html; charset=UTF-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
 echo "<!DOCTYPE html><meta charset=UTF-8><meta name=viewport content='width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover'>\n";
 
+/* path to move uploaded file */
 $SAFE_STACK_CONVERTER_UPLOADS_DIR = "stack-uploads/";
-$SHOW_PACKAGED_SOLO_STACK = false;
+
+/* path to Maconv if you want to open .sit, .dsk, etc */
 $MACONV_INSTALLATION_LOCATION = null;
 
-require("file-system-aux.php");
+/* set to true if you want to show the stack by linking in the xtalk templates from hypercardsimulator.com */
+$SHOW_PACKAGED_SOLO_STACK = false;
 
+@include("file-system-aux.php");
+
+/* set these to something for testing. otherwise the upload form will take care of it. */
 $filename = "";
 $contents = "";
 $possible_resource_fork = "";
@@ -61,19 +67,25 @@ if (!$filename && isset($_POST['convert']))
 	{
 		if (!move_uploaded_file($_FILES["fileToUpload"]["tmp_name"], $target_file)) 
 			echo "<center><h3><font color=red>Sorry, there was an error uploading your file.</font></h3></center>";
+		else if (empty(testforstackness($target_file)))
+		{
+			// it's a stack file, continue
+		}
 		else 
 		{			
 			/*echo shell_exec($MACONV_INSTALLATION_LOCATION."maconv".' -v e stack-uploads/PianoKeys.img '.'SUPKI')."\n";
 			echo "<center><h3>".$target_file." ".$target_file_extension."....</h3></center>";*/
 			//echo "The file ". htmlspecialchars( basename( $_FILES["fileToUpload"]["name"])). " has been uploaded.";
 			if (!empty($MACONV_INSTALLATION_LOCATION) 
-				&& ($target_file_extension == 'img' || $target_file_extension == 'dsk' || $target_file_extension == 'sit' 
-					|| file_get_contents($target_file, NULL, NULL, 4, 4) == 'SIT!'))
+				/*&& ($target_file_extension == 'img' || $target_file_extension == 'dsk' || $target_file_extension == 'sit' 
+					|| file_get_contents($target_file, NULL, NULL, 4, 4) == 'SIT!')*/)
 			{
 				// try to unstuff with the beautiful Maconv software
 				//	echo "<center><h3>Maconv decompressing....</h3></center>";
 				//	echo "<pre>".shell_exec($MACONV_INSTALLATION_LOCATION."maconv --help")."\n</pre>";
-				$maconv_output_folder = $target_dir."maconv-results/".$target_srcname;
+				$maconv_output_folder = $target_dir."maconv-results/".preg_replace('/[^A-Za-z0-9\-\_]/', '-', $target_srcname);
+				echo shell_exec("rm -rf " . escapeshellarg($maconv_output_folder));
+				
 				echo "<pre style='display:none;'>\n";
 				echo shell_exec($MACONV_INSTALLATION_LOCATION."maconv e ".escapeshellarg($target_file)." ".escapeshellarg($maconv_output_folder));
 			//	echo "<pre>".shell_exec($MACONV_INSTALLATION_LOCATION."maconv -v e ".escapeshellarg($target_file).' '.escapeshellarg($maconv_output_folder))."\n</pre>";
@@ -145,8 +157,8 @@ function testforstackness($target_file)
 	return "";
 }
 
-	//$possible_resource_fork = "Piano Keys v 2.1.rsrc";
-	//$possible_resource_fork = "Pantechnicon.rsrc";
+//$possible_resource_fork = "Piano Keys v 2.1.rsrc";
+//$possible_resource_fork = "Pantechnicon.rsrc";
 // start by reading in the resources so they're ready to go
 if ($possible_resource_fork && file_exists($possible_resource_fork) && ($contents=file_get_contents($possible_resource_fork)))
 {
@@ -193,7 +205,7 @@ if ($possible_resource_fork && file_exists($possible_resource_fork) && ($content
 	if (isset($types['ICON']))
 	{
 		
-		// this works but we need to attach it to the stack itself so it can be saved
+	// this works but we need to attach it to the stack itself so it can be saved
 ?>
 <script>
 	var convertedicons = <?php echo json_encode($types['ICON']); ?>;
@@ -265,6 +277,8 @@ function output_form()
 
 <?php
 }
+
+/* begin the stack read. A stack is a chain of simple blocks called STAK, CARD, etc. */
 
 $contents = file_get_contents($filename);
 $i = 0;
@@ -498,18 +512,11 @@ function read_CARDorBKGD_block($i, $size, $isBKGD)
 
 		$csize = (two($i+2)+4);
 		
-		/*
-			Elfballs triggers the "past the contents count". I commented it out and it loads. Something wrong with my logic probably.
-			Elfballs calls something called end_elfballs which freaks out the parser somewhere. Improperly ending identifiers??
-			Reading the resource fork of Help.rsrc craps out. Maybe it is an older model of resource fork......ugghhhhhhh....
-			But, cool work today. Almost got 1.0 really working. THAT's a twitter post.
-		*/
-		
 		//if ($i > $stop) { echo "past the contents count\n"; exit(); }
 		//echo "contents size ".$csize." cid ".$cid." one($i+4) ".one($i+4)."\n";
 		
 		if (!$part) {
-			//echo "isBKGD ".$isBKGD." id ".$ID." unknown cid ".$cid."<br>"; 	// seems to be possible in uncompressed stack
+			//echo "isBKGD ".$isBKGD." id ".$ID." unknown cid ".$cid."<br>"; 	// seems to be possible in uncompressed stack to have obselete bg fld data 
 		}
 		else if (one($i+4)) 
 		{
@@ -732,6 +739,7 @@ $stack['$$'] = array_merge($bkgnds, $cards);
 
 if ($SHOW_PACKAGED_SOLO_STACK)
 {
+	/* Output the JSON as HTML and display a set of minimal controls with the templates from Hypercardsimulator.com/script.js */
 ?>
 <base href="https://hypercardsimulator.com/">
 <style>
@@ -826,6 +834,7 @@ if ($SHOW_PACKAGED_SOLO_STACK)
 }
 else if (isset($target_srcname))
 {
+	/* we're here because of an upload */
 ?>
 <script>
 	var json=<?php echo json_encode($stack); ?>;
@@ -837,6 +846,8 @@ else if (isset($target_srcname))
 	<?php
 }
 else {
+	/* no solo stack, no upload, just output  json */
+	
 	echo '<code style="display: block; overflow-wrap: break-word; word-break: break-all; background: white; padding: 8px; color: #555; border-top: thin solid gray;">';
 	echo str_replace('&','&amp;',str_replace('<','&lt;',json_encode($stack,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_LINE_TERMINATORS)));
 }
