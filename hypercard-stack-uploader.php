@@ -22,9 +22,9 @@ $show_errors = true;
 ini_set('display_errors', $show_errors ? 1 : 0);
 error_reporting($show_errors ? -1 : 0); 	// this is really hard core, in PHP 8 it's the default
 
-header('Content-Type: text/html; charset=UTF-8');
+header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
-echo "<!DOCTYPE html><meta charset=UTF-8><meta name=viewport content='width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover'>\n";
+echo "<!DOCTYPE html><meta charset=utf-8><meta name=viewport content='width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover'>\n";
 
 /* path to move uploaded file */
 $SAFE_STACK_CONVERTER_UPLOADS_DIR = "stack-uploads/";
@@ -49,94 +49,116 @@ $i = 0;
 		.escapeshellarg($SAFE_STACK_CONVERTER_UPLOADS_DIR."foul_airs.dsk")." "
 		.escapeshellarg($SAFE_STACK_CONVERTER_UPLOADS_DIR."maconv-results/"."foul_airs.dsk")
 	)."</pre>\n";*/
+/*echo shell_exec($MACONV_INSTALLATION_LOCATION."maconv".' -v e stack-uploads/PianoKeys.img '.'SUPKI')."\n";
+echo "<center><h3>".$target_file." ".$target_file_extension."....</h3></center>";*/
+//echo "The file ". htmlspecialchars( basename( $_FILES["fileToUpload"]["name"])). " has been uploaded.";
+
+if (isset($_POST['whichimport']))
+{
+	$maconv_output_folder = $SAFE_STACK_CONVERTER_UPLOADS_DIR."maconv-results/";
+	
+	$target_srcname = str_replace("..","",$_POST['whichimport']);	// need to strip any dotty business
+	$filename = $maconv_output_folder.$target_srcname;
+	$possible_resource_fork = $maconv_output_folder.$target_srcname.'.rsrc';
+}
 
 if (!$filename && isset($_POST['convert']))
 {
 	$target_dir = $SAFE_STACK_CONVERTER_UPLOADS_DIR;
 	@mkdir($target_dir);
-	$target_srcname = basename($_FILES["fileToUpload"]["name"]);
+	$uploadname = basename($_FILES["fileToUpload"]["name"]);
+	$target_srcname = $uploadname;
 	$target_file = $target_dir . $target_srcname;
-	$uploadOk = 1;
 	$target_file_extension = pathinfo($target_file,PATHINFO_EXTENSION);
 	
 	// Check file size
-	if ($_FILES["fileToUpload"]["size"] > 10000000) {
+	if ($_FILES["fileToUpload"]["size"] > 10000000) 
 		echo "<center><h3><font color=red>Sorry, “Mr IIfx”, that file is too large.</font></h3></center>";
-	} 
-	else 
+	else if (!move_uploaded_file($_FILES["fileToUpload"]["tmp_name"], $target_file)) 
+		echo "<center><h3><font color=red>Sorry, there was an error uploading your file.</font></h3></center>";
+	else if (empty(testforstackness($target_file)))
 	{
-		if (!move_uploaded_file($_FILES["fileToUpload"]["tmp_name"], $target_file)) 
-			echo "<center><h3><font color=red>Sorry, there was an error uploading your file.</font></h3></center>";
-		else if (empty(testforstackness($target_file)))
-		{
-			// it's a stack file, continue
+		// it's a stack file, continue
+	}
+	else if (!empty($MACONV_INSTALLATION_LOCATION) /*&& ($target_file_extension == 'img' || $target_file_extension == 'dsk' || $target_file_extension == 'sit' 
+		|| file_get_contents($target_file, NULL, NULL, 4, 4) == 'SIT!')*/)
+	{
+		// try to unstuff with the beautiful Maconv software
+		//	echo "<center><h3>Maconv decompressing....</h3></center>";
+		//	echo "<pre>".shell_exec($MACONV_INSTALLATION_LOCATION."maconv --help")."\n</pre>";
+		$friendly_archive_name = preg_replace('/[^A-Za-z0-9\-\_]/', '-', $target_srcname);
+		$maconv_output_folder = $target_dir."maconv-results/".$friendly_archive_name;
+		echo "<pre style='display:none;'>\n";
+		echo shell_exec("rm -rf " . escapeshellarg($maconv_output_folder));
+		echo shell_exec($MACONV_INSTALLATION_LOCATION."maconv e ".escapeshellarg($target_file)." ".escapeshellarg($maconv_output_folder));
+	//	echo "<pre>".shell_exec($MACONV_INSTALLATION_LOCATION."maconv -v e ".escapeshellarg($target_file).' '.escapeshellarg($maconv_output_folder))."\n</pre>";
+		//$firstlevel = explode("\n", shell_exec('ls '.escapeshellarg($maconv_output_folder)));
+		//print_r($firstlevel);
+
+		function rglob($pattern, $flags = 0) {
+			$files = glob($pattern, $flags); 
+			foreach (glob(dirname($pattern).'/*', GLOB_ONLYDIR|GLOB_NOSORT) as $dir) {
+				$files = array_merge($files, rglob($dir.'/'.basename($pattern), $flags));
+			}
+			return $files;
 		}
-		else 
-		{			
-			/*echo shell_exec($MACONV_INSTALLATION_LOCATION."maconv".' -v e stack-uploads/PianoKeys.img '.'SUPKI')."\n";
-			echo "<center><h3>".$target_file." ".$target_file_extension."....</h3></center>";*/
-			//echo "The file ". htmlspecialchars( basename( $_FILES["fileToUpload"]["name"])). " has been uploaded.";
-			if (!empty($MACONV_INSTALLATION_LOCATION) 
-				/*&& ($target_file_extension == 'img' || $target_file_extension == 'dsk' || $target_file_extension == 'sit' 
-					|| file_get_contents($target_file, NULL, NULL, 4, 4) == 'SIT!')*/)
-			{
-				// try to unstuff with the beautiful Maconv software
-				//	echo "<center><h3>Maconv decompressing....</h3></center>";
-				//	echo "<pre>".shell_exec($MACONV_INSTALLATION_LOCATION."maconv --help")."\n</pre>";
-				$maconv_output_folder = $target_dir."maconv-results/".preg_replace('/[^A-Za-z0-9\-\_]/', '-', $target_srcname);
-				echo shell_exec("rm -rf " . escapeshellarg($maconv_output_folder));
-				
-				echo "<pre style='display:none;'>\n";
-				echo shell_exec($MACONV_INSTALLATION_LOCATION."maconv e ".escapeshellarg($target_file)." ".escapeshellarg($maconv_output_folder));
-			//	echo "<pre>".shell_exec($MACONV_INSTALLATION_LOCATION."maconv -v e ".escapeshellarg($target_file).' '.escapeshellarg($maconv_output_folder))."\n</pre>";
-				//$firstlevel = explode("\n", shell_exec('ls '.escapeshellarg($maconv_output_folder)));
-				//print_r($firstlevel);
+		
+		$firstlevel = Array();
+		$cwd = getcwd();
+		if (chdir($maconv_output_folder))
+		{
+			$firstlevel = (rglob('*'));	// try this instead
+			chdir($cwd);
+			print_r($firstlevel);
+		}
+		
+		echo "</pre>\n";
 
-				function rglob($pattern, $flags = 0) {
-					$files = glob($pattern, $flags); 
-					foreach (glob(dirname($pattern).'/*', GLOB_ONLYDIR|GLOB_NOSORT) as $dir) {
-						$files = array_merge($files, rglob($dir.'/'.basename($pattern), $flags));
-					}
-					return $files;
-				}
-				
-				$firstlevel = Array();
-				$cwd = getcwd();
-				if (chdir($maconv_output_folder))
-				{
-					$firstlevel = (rglob('*'));	// try this instead
-					chdir($cwd);
-					print_r($firstlevel);
-				}
-				
-				echo "</pre>\n";
-
-				$target_srcname = '';
-				$possible_resource_fork = "";
-				foreach ($firstlevel as $target_file)
-				{
-					if ($target_file=='' || $target_file=='.' || $target_file=='..') 
-						continue;
-					if (substr($target_file,0,2)=='./') $target_file = substr($target_file,2);
-					if (empty(testforstackness($maconv_output_folder.'/'.$target_file)))
-					{
-						$target_srcname = $target_file;
-						$possible_resource_fork = $maconv_output_folder.'/'.$target_file.'.rsrc';
-						break;
-					}
-				}
-				if (empty($target_srcname))
-				{
-					echo "<center><h3><font color=red>Could not locate a HyperCard stack file in archive.</font></h3></center>";
-				}
-			}
-			else
+		$firstlevel = array_reverse($firstlevel);
+		$candidates = Array();
+		
+		$target_srcname = '';
+		$possible_resource_fork = "";
+		foreach ($firstlevel as $target_file)
+		{
+			if ($target_file=='' || $target_file=='.' || $target_file=='..') 
+				continue;
+			if (substr($target_file,0,2)=='./') $target_file = substr($target_file,2);
+			if (is_file($maconv_output_folder.'/'.$target_file) && empty(testforstackness($maconv_output_folder.'/'.$target_file)))
 			{
-				$error = testforstackness($target_file);
-				if (!empty($error))
-					echo $error;
+				array_push($candidates, $target_file);
+
+				$target_srcname = $target_file;
+				$possible_resource_fork = $maconv_output_folder.'/'.$target_file.'.rsrc';
+				//break;
 			}
-		} 
+		}
+		
+		if (empty($target_srcname))
+		{
+			echo "<center><h3><font color=red>Could not locate a HyperCard stack file in archive.</font></h3></center>";
+		}
+		else if (count($candidates) > 1)
+		{
+			$filename = "";
+
+			echo "<form method=post>";
+			echo /*"‘".htmlspecialchars($uploadname)."’"*/ "Archive contains ".count($candidates)." stacks, select one to import:<br>";
+			$first=true;
+			foreach ($candidates as $c)
+			{
+				echo "<label><input type=radio name=whichimport value=\"".htmlspecialchars($friendly_archive_name."/".$c)."\" ".($first ? "checked=true" : "")."> ".$c." (".(round(filesize($maconv_output_folder.'/'.$c)/1000))."K)</label><br>";
+				$first = false;
+			}
+			echo "<input type=submit value=Import></form>";
+			return;
+		}
+	}
+	else
+	{
+		$error = testforstackness($target_file);
+		if (!empty($error))
+			echo $error;
 	}
 }
 
@@ -144,7 +166,7 @@ function testforstackness($target_file)
 {
 	global $filename;
 	
-	if (file_get_contents($target_file, NULL, NULL, 4, 4) != 'STAK')
+	if (file_get_contents($target_file, NULL, NULL, 4, 4) != 'STAK')	// i've seen this create a 'is a directory' error with Get Rich Quick . sit
 	{
 		return "<center><h3><font color=red>That doesn't seem to be a stack file.</font></h3></center>";
 	}
@@ -226,6 +248,9 @@ if ($possible_resource_fork && file_exists($possible_resource_fork) && ($content
 		//console.log(imgData.data);
 		ctx.putImageData(imgData,0,0);
 		ImportedICONImages[icon.ID] = workcanvas.toDataURL();
+		//if (!ImportedICONImages[icon.name]) 
+		//	ImportedICONImages[icon.name] = icon.ID;
+		if (icon.name) ImportedICONImages[icon.name] = workcanvas.toDataURL();	// shrug
 	});
 </script>
 <?php
@@ -283,6 +308,12 @@ function output_form()
 $contents = file_get_contents($filename);
 $i = 0;
 $hc1 = (four(16) < 9);
+
+if (!$SHOW_PACKAGED_SOLO_STACK && $contents !== false)
+{
+	echo "Upload successful.<br>Now importing stack. Please be patient...<br>";
+	flush();
+}
 
 function one($i) {
 	global $contents;
@@ -645,7 +676,7 @@ while ($i < strlen($contents))
 		break;
 }
 
-$stack = Array('$'=>'stack-part','name'=>macroman($target_srcname??$filename));
+$stack = Array('$'=>'stack-part','name'=>macroman(basename($target_srcname??$filename)));
 
 $STAK = find($blocks, 'STAK');
 $i = $STAK['i'];
@@ -710,29 +741,37 @@ foreach ($blocks as $block)
 //print_r($bkgnds);
 //exit();
 
+$cards = Array();
+	
 $LIST = find($blocks, 'LIST');
 $i = $LIST['i'];
 if ($hc1) $i -= 4;	// HC1 format is shifted 4 bytes
+$pagecount = four($i+16);
 $entrysize = two($i+28);
 
-$cards = Array();
-foreach ($blocks as $block)
+for ($e = 0; $e < $pagecount; $e++)
 {
-	if ($block['type'] != 'PAGE') 
-		continue;
-
-	$i = $block['i']+24;
-
-	do {
-		$id = four($i);
-		$nextentry = $i + $entrysize;
-		if ($id != 0)
-		{
-			$CARD = find($blocks,'CARD',$id);
-			array_push($cards, read_CARDorBKGD_block($CARD['i'], $CARD['size'], false));
-		}
-		$i = $nextentry;
-	} while ($i < $block['i'] + $block['size']);
+	$pageid = four($i + 48 + $e * 6);
+	
+	foreach ($blocks as $block)
+	{
+		if ($block['type'] != 'PAGE' || $block['ID'] != $pageid) 
+			continue;
+		
+		$i = $block['i']+24;
+		
+		do {
+			$id = four($i);
+			$nextentry = $i + $entrysize;
+			if ($id != 0)
+				{
+					$CARD = find($blocks,'CARD',$id);
+					array_push($cards, read_CARDorBKGD_block($CARD['i'], $CARD['size'], false));
+				}
+			$i = $nextentry;
+		} while ($i < $block['i'] + $block['size']);
+	}
+	
 }
 	
 $stack['$$'] = array_merge($bkgnds, $cards);
