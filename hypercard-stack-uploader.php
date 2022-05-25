@@ -745,20 +745,25 @@ $cards = Array();
 	
 $LIST = find($blocks, 'LIST');
 $i = $LIST['i'];
-if ($hc1) $i -= 4;	// HC1 format is shifted 4 bytes
+if ($hc1) $i -= 4;	// HC1 format is shifted 4 bytes.
 $pagecount = four($i+16);
 $entrysize = two($i+28);
+if ($hc1) $i += 4;	// but the list is in the same place
 
 for ($e = 0; $e < $pagecount; $e++)
 {
 	$pageid = four($i + 48 + $e * 6);
+	$oldPageI = $i;
+	//echo "Searching PAGE ID ".$pageid."<br>";
 	
 	foreach ($blocks as $block)
 	{
 		if ($block['type'] != 'PAGE' || $block['ID'] != $pageid) 
 			continue;
 		
+		// found the pageID which is a list of CARDs
 		$i = $block['i']+24;
+		//if ($hc1) $i -= 4;	// HC1 format is shifted 4 bytes. update: no not for this block
 		
 		do {
 			$id = four($i);
@@ -770,8 +775,11 @@ for ($e = 0; $e < $pagecount; $e++)
 				}
 			$i = $nextentry;
 		} while ($i < $block['i'] + $block['size']);
+		
+		break;
 	}
 	
+	$i = $oldPageI;
 }
 	
 $stack['$$'] = array_merge($bkgnds, $cards);
