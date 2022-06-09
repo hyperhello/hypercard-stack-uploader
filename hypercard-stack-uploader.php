@@ -8,11 +8,13 @@
 	Although the code is not very well-written or pretty, in the interests of public discourse, I am making it available for view. 
 	
 	THANK YOU TO THE RETRO-HACKERS WHO FIGURED OUT THE HC STACK FORMAT.
-	https://hypercard.org/hypercard_file_format_pierre/
 	https://github.com/PierreLorenzi/HyperCardPreview/blob/master/StackFormat.md
+	https://github.com/ParksProjets/Maconv
+	https://github.com/uliwitness/snd2wav
 	
 	This php script shows a form that lets the user upload HyperCard 1.x or 2.x stacks. 
 	If installed, it uses Maconv to get it out of a StuffIt archive, .dsk, or .img file.
+	If installed, it uses snd2wav to import the Mac SND resources.
 	It translates the stack to a big JSON with mostly proper HC property names. 
 	Then at the end, depending on the flag it either shows the JSON, sends it to the parent window, or puts the stack up on display.
 	
@@ -26,22 +28,27 @@ header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
 echo "<!DOCTYPE html><meta charset=utf-8><meta name=viewport content='width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover'>\n";
 
+/* byte size limit */
+$UPLOAD_BYTES_LIMIT = 15000000;
 /* path to move uploaded file */
 $SAFE_STACK_CONVERTER_UPLOADS_DIR = "stack-uploads/";
-
 /* path to Maconv if you want to open .sit, .dsk, etc */
 $MACONV_INSTALLATION_LOCATION = null;
+/* path to snd2wav if you want to import SND resource files */
+$SND2WAV_INSTALLATION_EXECUTABLE = null;
 
 /* set to true if you want to show the stack by linking in the xtalk templates from hypercardsimulator.com */
 $SHOW_PACKAGED_SOLO_STACK = false;
+
+if (isset($_GET['show']))
+	$SHOW_PACKAGED_SOLO_STACK = true;
 
 @include("file-system-aux.php");
 
 /* set these to something for testing. otherwise the upload form will take care of it. */
 $filename = "";
-$contents = "";
 $possible_resource_fork = "";
-$i = 0;
+$nihongo_translation = isset($_POST['nihongo']);
 
 //	echo "<pre>".shell_exec($MACONV_INSTALLATION_LOCATION."maconv e -h " )."</pre>\n";
 /*echo "<pre>"
@@ -52,16 +59,99 @@ $i = 0;
 /*echo shell_exec($MACONV_INSTALLATION_LOCATION."maconv".' -v e stack-uploads/PianoKeys.img '.'SUPKI')."\n";
 echo "<center><h3>".$target_file." ".$target_file_extension."....</h3></center>";*/
 //echo "The file ". htmlspecialchars( basename( $_FILES["fileToUpload"]["name"])). " has been uploaded.";
-
+function escapeshellarg_rewrite($arg)
+{
+	return "'" . str_replace("'", "'\\''", $arg) . "'";
+}
+	
 if (isset($_POST['whichimport']))
 {
 	$maconv_output_folder = $SAFE_STACK_CONVERTER_UPLOADS_DIR."maconv-results/";
 	
-	$target_srcname = str_replace("..","",$_POST['whichimport']);	// need to strip any dotty business
-	$filename = $maconv_output_folder.$target_srcname;
-	$possible_resource_fork = $maconv_output_folder.$target_srcname.'.rsrc';
+	$target_srcname = str_replace("/../","",$_POST['whichimport']);	// need to strip any dotty business
+	$target_file = $maconv_output_folder.$target_srcname;
+	
+	$error = testforstackness($target_file);
+	if (!empty($error))
+		echo $error;
+	else
+	{
+		$possible_resource_fork = $maconv_output_folder.$target_srcname.'.rsrc';
+	}
 }
 
+function output_archive_picker_form($friendly_archive_name)
+{
+	global $SAFE_STACK_CONVERTER_UPLOADS_DIR;
+	global $nihongo_translation;
+	
+	function rglob($pattern, $flags = 0) 
+	{
+		$files = glob($pattern, $flags); 
+		foreach (glob(dirname($pattern).'/*', GLOB_ONLYDIR|GLOB_NOSORT) as $dir) {
+			$files = array_merge($files, rglob($dir.'/'.basename($pattern), $flags));
+			}
+		return $files;
+	}
+	
+	$target_dir = $SAFE_STACK_CONVERTER_UPLOADS_DIR;
+	$maconv_output_folder = $target_dir."maconv-results/".$friendly_archive_name;
+
+	$firstlevel = Array();
+	$cwd = getcwd();
+	if (chdir($maconv_output_folder))
+	{
+		$firstlevel = (rglob('*'));	// try this instead
+		chdir($cwd);
+		//print_r($firstlevel);
+	}
+		
+	//$firstlevel = array_reverse($firstlevel);
+	$candidates = Array();
+	
+	$target_srcname = '';
+	$possible_resource_fork = "";
+	foreach ($firstlevel as $target_file)
+	{
+		if ($target_file=='' || $target_file=='.' || $target_file=='..') 
+			continue;
+		if (substr($target_file,0,2)=='./') $target_file = substr($target_file,2);
+		if (is_file($maconv_output_folder.'/'.$target_file) && empty(testforstackness($maconv_output_folder.'/'.$target_file)))
+			{
+				array_push($candidates, $target_file);
+				
+				$target_srcname = $target_file;
+				$possible_resource_fork = $maconv_output_folder.'/'.$target_file.'.rsrc';
+				//break;
+			}
+	}
+	
+	if (empty($target_srcname))
+	{
+		return false;
+		echo "<center><h3><font color=red>Could not locate a HyperCard stack file in archive.</font></h3></center>";
+	}
+	else if (count($candidates) > 1)
+	{
+		$filename = "";
+		
+		echo "<form method=post>";
+		echo "<input type=hidden name=whicharchive value=\"".htmlspecialchars($friendly_archive_name)."\">";
+		echo /*"‘".htmlspecialchars($uploadname)."’"*/ "Archive contains ".count($candidates)." stacks, select one to import:<br>";
+		$first=true;
+		foreach ($candidates as $c)
+			{
+				echo "<label><input type=radio name=whichimport value=\"".htmlspecialchars($friendly_archive_name."/".$c)."\" ".($first ? "checked=true" : "")."> ".$c." (".(round(filesize($maconv_output_folder.'/'.$c)/1000))."K)</label><br>";
+				$first = false;
+			}
+		echo "<input type=submit value='Import Selected' style='font: bold 1em system-ui;'>";
+		echo " <label><input type=checkbox name=nihongo ".($nihongo_translation ? "checked" : '')."> 日本語</label>";
+		echo "</form><br>";
+		echo "<a href='.'>Import another...</a>";
+		return true;
+	}
+}
+	
 if (!$filename && isset($_POST['convert']))
 {
 	$target_dir = $SAFE_STACK_CONVERTER_UPLOADS_DIR;
@@ -72,7 +162,7 @@ if (!$filename && isset($_POST['convert']))
 	$target_file_extension = pathinfo($target_file,PATHINFO_EXTENSION);
 	
 	// Check file size
-	if ($_FILES["fileToUpload"]["size"] > 10000000) 
+	if ($_FILES["fileToUpload"]["size"] > $UPLOAD_BYTES_LIMIT) 
 		echo "<center><h3><font color=red>Sorry, “Mr IIfx”, that file is too large.</font></h3></center>";
 	else if (!move_uploaded_file($_FILES["fileToUpload"]["tmp_name"], $target_file)) 
 		echo "<center><h3><font color=red>Sorry, there was an error uploading your file.</font></h3></center>";
@@ -89,13 +179,28 @@ if (!$filename && isset($_POST['convert']))
 		$friendly_archive_name = preg_replace('/[^A-Za-z0-9\-\_]/', '-', $target_srcname);
 		$maconv_output_folder = $target_dir."maconv-results/".$friendly_archive_name;
 		echo "<pre style='display:none;'>\n";
+		/*echo $target_file."<br>";
+		echo escapeshellarg($target_file)."<br>";
+		echo escapeshellarg_rewrite($target_file)."<br>";*/
 		echo shell_exec("rm -rf " . escapeshellarg($maconv_output_folder));
-		echo shell_exec($MACONV_INSTALLATION_LOCATION."maconv e ".escapeshellarg($target_file)." ".escapeshellarg($maconv_output_folder));
+		//echo $MACONV_INSTALLATION_LOCATION."maconv e ".escapeshellarg($target_file)." ".escapeshellarg($maconv_output_folder)."<br>";
+		echo shell_exec($MACONV_INSTALLATION_LOCATION."maconv e ".escapeshellarg_rewrite($target_file)." ".escapeshellarg($maconv_output_folder));
 	//	echo "<pre>".shell_exec($MACONV_INSTALLATION_LOCATION."maconv -v e ".escapeshellarg($target_file).' '.escapeshellarg($maconv_output_folder))."\n</pre>";
 		//$firstlevel = explode("\n", shell_exec('ls '.escapeshellarg($maconv_output_folder)));
 		//print_r($firstlevel);
-
-		function rglob($pattern, $flags = 0) {
+		echo "</pre>\n";
+		
+		$picker_form_result = output_archive_picker_form($friendly_archive_name);
+		if ($picker_form_result === false)
+			echo "<center><h3><font color=red>Could not locate a HyperCard stack file in archive.</font></h3></center>";
+		else if ($picker_form_result === true)
+			return;
+		else {
+			$target_srcname = $picker_form_result;
+			$possible_resource_fork = $target_srcname.'.rsrc';
+		}
+		
+		/*function rglob($pattern, $flags = 0) {
 			$files = glob($pattern, $flags); 
 			foreach (glob(dirname($pattern).'/*', GLOB_ONLYDIR|GLOB_NOSORT) as $dir) {
 				$files = array_merge($files, rglob($dir.'/'.basename($pattern), $flags));
@@ -143,16 +248,20 @@ if (!$filename && isset($_POST['convert']))
 			$filename = "";
 
 			echo "<form method=post>";
-			echo /*"‘".htmlspecialchars($uploadname)."’"*/ "Archive contains ".count($candidates)." stacks, select one to import:<br>";
+			echo "<input type=hidden name=whicharchive value=\"".htmlspecialchars($friendly_archive_name)."\">";
+			//echo "‘".htmlspecialchars($uploadname)."’";
+			echo "Archive contains ".count($candidates)." stacks, select one to import:<br>";
 			$first=true;
 			foreach ($candidates as $c)
 			{
 				echo "<label><input type=radio name=whichimport value=\"".htmlspecialchars($friendly_archive_name."/".$c)."\" ".($first ? "checked=true" : "")."> ".$c." (".(round(filesize($maconv_output_folder.'/'.$c)/1000))."K)</label><br>";
 				$first = false;
 			}
-			echo "<input type=submit value=Import></form>";
+			echo "<input type=submit value='Import Selected' style='font: bold 1em system-ui;'>";
+			echo " <label><input type=checkbox name=nihongo ".($nihongo_translation ? "checked" : '')."> 日本語</label>";
+			echo "</form>";
 			return;
-		}
+		}*/
 	}
 	else
 	{
@@ -166,7 +275,7 @@ function testforstackness($target_file)
 {
 	global $filename;
 	
-	if (file_get_contents($target_file, NULL, NULL, 4, 4) != 'STAK')	// i've seen this create a 'is a directory' error with Get Rich Quick . sit
+	if (!file_exists($target_file) || file_get_contents($target_file, NULL, NULL, 4, 4) != 'STAK')	// i've seen this create a 'is a directory' error with Get Rich Quick . sit
 	{
 		return "<center><h3><font color=red>That doesn't seem to be a stack file.</font></h3></center>";
 	}
@@ -213,9 +322,9 @@ if ($possible_resource_fork && file_exists($possible_resource_fork) && ($content
 			$nameoffset = two($reflistoffset+2);
 			$dataoffset = four($reflistoffset+4)&0x00FFFFFF;
 			$resources[] = Array(
-				'ID'=>two($reflistoffset),
+				'ID'=>two($reflistoffset,true),
 				'name'=>($nameoffset==0xFFFF)?''	// macroman?
-					:macroman(substr($contents, $map + $i_of_namelist + $nameoffset + 1, one($map + $i_of_namelist + $nameoffset))),
+					: macroman(substr($contents, $map + $i_of_namelist + $nameoffset + 1, one($map + $i_of_namelist + $nameoffset))),
 				//'length'=>four($data + $dataoffset),
 				'data'=>base64_encode(substr($contents, $data + $dataoffset + 4, four($data + $dataoffset)))
 			);
@@ -226,37 +335,175 @@ if ($possible_resource_fork && file_exists($possible_resource_fork) && ($content
 	}
 	if (isset($types['ICON']))
 	{
-		
-	// this works but we need to attach it to the stack itself so it can be saved
 ?>
 <script>
 	var convertedicons = <?php echo json_encode($types['ICON']); ?>;
 	var workcanvas = document.createElement('canvas');
-	workcanvas.width = workcanvas.height = 32;
-	var ctx = workcanvas.getContext('2d');
 	var ImportedICONImages = {};
-	convertedicons.forEach((icon)=>{
+	/*convertedicons.forEach((icon)=>{
 		var imgData = ctx.createImageData(32,32), bitmap = atob(icon.data);
 		for (var i = 0; i < imgData.data.length; i += 4) 
-		{
-			var bit = bitmap.charCodeAt(Math.floor(i/32)) & (0x80>>((i/4)%8));
-			imgData.data[i+0] = bit ? 0 : 255;
-			imgData.data[i+1] = bit ? 0 : 255;
-			imgData.data[i+2] = bit ? 0 : 255;
-			imgData.data[i+3] = 255;
-		}
-		//console.log(imgData.data);
+			{
+				var bit = bitmap.charCodeAt(Math.floor(i/32)) & (0x80>>((i/4)%8));
+				imgData.data[i+0] = bit ? 0 : 255;
+				imgData.data[i+1] = bit ? 0 : 255;
+				imgData.data[i+2] = bit ? 0 : 255;
+				imgData.data[i+3] = 255;
+			}
 		ctx.putImageData(imgData,0,0);
 		ImportedICONImages[icon.ID] = workcanvas.toDataURL();
-		//if (!ImportedICONImages[icon.name]) 
-		//	ImportedICONImages[icon.name] = icon.ID;
+		//if (!ImportedICONImages[icon.name]) ImportedICONImages[icon.name] = icon.ID;
+		if (icon.name) ImportedICONImages[icon.name] = workcanvas.toDataURL();	// shrug
+	});*/
+	convertedicons.forEach((icon)=>{
+		workcanvas.width = workcanvas.height = 34;
+		var ctx = workcanvas.getContext('2d');
+		var imgData = ctx.createImageData(32,32), bitmap = atob(icon.data);
+		for (var i = 0; i < imgData.data.length; i += 4) 
+			{
+				var bit = bitmap.charCodeAt(Math.floor(i/32)) & (0x80>>((i/4)%8));
+				imgData.data[i+0] = bit ? 0 : 255;
+				imgData.data[i+1] = bit ? 0 : 255;
+				imgData.data[i+2] = bit ? 0 : 255;
+				imgData.data[i+3] = 255;
+			}
+		ctx.fillStyle = 'white';
+		ctx.fillRect(0,0,workcanvas.width,workcanvas.height);
+		ctx.putImageData(imgData,1,1);	// put it at 1,1
+
+		var canvasWidth = workcanvas.width, canvasHeight = workcanvas.height, clickloc = {x:0,y:0}, context = ctx, dpr=1;
+		var colorLayer = context.getImageData(0,0,canvasWidth,canvasHeight);
+		var pixelStack = [[Math.floor(clickloc.x*dpr), Math.floor(clickloc.y*dpr)]];
+		var time = Date.now(), pops = 0;
+		var startR=(colorLayer.data[(Math.floor(clickloc.y*dpr)*canvasWidth + Math.floor(clickloc.x*dpr))*4]);
+		var startG=(colorLayer.data[(Math.floor(clickloc.y*dpr)*canvasWidth + Math.floor(clickloc.x*dpr))*4+1]);
+		var startB=(colorLayer.data[(Math.floor(clickloc.y*dpr)*canvasWidth + Math.floor(clickloc.x*dpr))*4+2]);
+		var startA=(colorLayer.data[(Math.floor(clickloc.y*dpr)*canvasWidth + Math.floor(clickloc.x*dpr))*4+3]);
+		console.log(startR,startG,startB,startA);
+		
+		while(pixelStack.length)
+			{
+				var newPos, x, y, pixelPos, reachLeft, reachRight;
+				newPos = pixelStack.pop();
+				x = newPos[0];
+				y = newPos[1];
+				pops++;
+				if (pops > 1000000) throw "aborting bucket";
+				
+				pixelPos = (y*canvasWidth + x) * 4;
+				while(y-- >= 0 && matchStartColor(pixelPos))
+					pixelPos -= canvasWidth * 4;
+				pixelPos += canvasWidth * 4;
+				++y;
+				reachLeft = false;
+				reachRight = false;
+				while(y++ < canvasHeight-1 && matchStartColor(pixelPos))
+					{							
+						/*colorLayer.data[pixelPos] = 197;
+						colorLayer.data[pixelPos+1] = 82;
+						colorLayer.data[pixelPos+2] = 142;*/
+						colorLayer.data[pixelPos+3] = 0;
+						
+						if(x > 0)
+							{
+								if(matchStartColor(pixelPos - 4))
+									{
+										if(!reachLeft){
+											pixelStack.push([x - 1, y]);
+											reachLeft = true;
+										}
+									}
+								else if (reachLeft)
+									{
+										reachLeft = false;
+									}
+							}
+						
+						if(x < canvasWidth-1)
+							{
+								if(matchStartColor(pixelPos + 4))
+									{
+										if(!reachRight)
+											{
+												pixelStack.push([x + 1, y]);
+												reachRight = true;
+											}
+									}
+								else if(reachRight)
+									{
+										reachRight = false;
+									}
+							}
+						
+						pixelPos += canvasWidth * 4;
+					}
+			}
+		
+		function matchStartColor(pixelPos)
+		{
+			var r = colorLayer.data[pixelPos];	
+			var g = colorLayer.data[pixelPos+1];	
+			var b = colorLayer.data[pixelPos+2];
+			var a = colorLayer.data[pixelPos+3];
+			
+			return (r===startR && g===startG && b===startB && a===startA);
+		}
+		
+		
+		workcanvas.width = workcanvas.height = 32;
+		ctx = workcanvas.getContext('2d');
+		ctx.clearRect(0,0,32,32);
+		ctx.putImageData(colorLayer, -1, -1, 1, 1, 32, 32);
+		
+		ImportedICONImages[icon.ID] = workcanvas.toDataURL();
+		//if (!ImportedICONImages[icon.name]) ImportedICONImages[icon.name] = icon.ID;
 		if (icon.name) ImportedICONImages[icon.name] = workcanvas.toDataURL();	// shrug
 	});
 </script>
 <?php
 	}
-	//print_r($types);	
-	//return;
+	
+	if (isset($types['snd ']) && isset($SND2WAV_INSTALLATION_EXECUTABLE))
+	{
+		$wav_resources = Array();
+		
+		setlocale(LC_CTYPE, "en_US.UTF-8");	// escapeshellarg doesn't include utf without it like ƒ .... sigh
+		
+		echo "<pre style='display:none;'>\n";
+
+		//echo "<pre>";
+		//print_r($possible_resource_fork);
+		//echo "<br>";
+		$target_dir = dirname($possible_resource_fork).'/';
+		//print_r($target_dir);
+		//echo "<br>";
+		
+		foreach ($types['snd '] as $snd)
+		{
+			//print_r($snd);
+			//echo "<br>";
+			$sndfile = $target_dir.'snd_resource_file';	//.'_'.$snd['ID']
+			//print_r($sndfile);
+			//echo "<br>";
+			file_put_contents($sndfile, base64_decode($snd['data']));
+			$shellcmd = $SND2WAV_INSTALLATION_EXECUTABLE.' '.escapeshellarg($sndfile).' '.escapeshellarg($sndfile.'_'.$snd['ID'].'.wav');
+			echo $shellcmd."<br>";
+			echo shell_exec($shellcmd);
+			echo "<BR>";
+			if (file_exists($sndfile.'_'.$snd['ID'].'.wav')) {
+				$snd['wav'] = file_get_contents($sndfile.'_'.$snd['ID'].'.wav');	// could make this the same file name too
+				$wav_resources[$snd['name']] = "data:audio/wav;base64,".base64_encode(file_get_contents($sndfile.'_'.$snd['ID'].'.wav'));
+			}
+		}
+		
+		echo "</pre>";
+
+?>
+<script>
+	var ImportedWAVResources = <?php echo json_encode($wav_resources); ?>;
+</script>
+<?php
+	}
 }
 	
 
@@ -268,6 +515,7 @@ if (!$filename)
 	
 function output_form()
 {
+	global $UPLOAD_BYTES_LIMIT;
 ?>
 
 <center>
@@ -275,7 +523,7 @@ function output_form()
 	function inspectInput(form)
 	{
 		var size = form.fileToUpload.files[0].size;
-		if (size > 10000000) { output.innerText = 'File too large. 10M max please.'; return false; } 
+		if (size > <?php echo $UPLOAD_BYTES_LIMIT; ?>) { output.innerText = "File too large. <?php echo round($UPLOAD_BYTES_LIMIT/1000000); ?>M max please."; return false; } 
 		output.innerText = 'Selected ' + Math.round(size/1000) + 'K file.';
 		return true;
 	}
@@ -286,14 +534,16 @@ function output_form()
 	console.log('Submitting form...'); 
 	return true;">
 	<h3>HyperCard Stack Importer</h3>
-	Select stack to upload (<code>.sit</code>, <code>.dsk</code>, <code>.img</code> or raw file):<br><br>
+	Select stack to upload (<code>.sit</code>, <code>.dsk</code>, <code>.img</code> or raw file):<br>
 	<input type="file" name="fileToUpload" id="fileToUpload" oninput="
 		if (document.readyState!='complete' || !inspectInput(this.form)) return;
 		if (this.form.onsubmit())
 			this.form.submit();
-		" style="padding: 10px 0px;">
+		" style="padding: 20px 0px; border: 0.5em dashed gray; border-radius: 1em;">
 	<input type="hidden" value="convert" name="convert" id="convert">
 	<input type="submit" value="Upload" name="dosubmit" id="dosubmit">
+	<br>
+	<label><input type=checkbox name=nihongo> 日本語</label>
 </form>
 </center>
 
@@ -358,7 +608,22 @@ function sizedstr($i,$stop) {
 }
 function macroman($out)
 {
+	global $nihongo_translation;
+	
+	if ($nihongo_translation)
+	{
+		$result = iconv('shift-jis', 'UTF-8', $out);
+		//if ($result===false) echo $out."<br>";
+		if ($result!==false) return $result;
+	}
+	
 	return iconv('macintosh', 'UTF-8', $out);
+	// probably got to convert this piecemeal using the japanese mappings
+	
+	$result = iconv('shift-jis', 'UTF-8', $out);
+	//$result = mb_convert_encoding($out, 'UTF-8', 'auto');
+	if ($result===false) $result = iconv('macintosh', 'UTF-8', $out);
+	return $result;
 }
 function dho($c) { return dechex(ord($c)); }
 function decodeanddivify($str) { 
@@ -471,7 +736,7 @@ function read_CARDorBKGD_block($i, $size, $isBKGD)
 		if ($flags&(1<<6) && $button) $part['hilite'] = true;
 		if ($flags&(1<<6) && !$button) $part['showLines'] = true;
 		if (!($flags&(1<<5)) && $button) $part['autoHilite'] = false;
-		if ($flags&(1<<5) && !$button) $part['wideMargins'] = true;
+		if (!($flags&(1<<5)) && !$button) $part['wideMargins'] = false;
 		if ($flags&(1<<4) && $button && $isBKGD) $part['sharedHilite'] = false;
 		if ($flags&(1<<4) && !$button) $part['multipleLines'] = true;
 		if ($flags&15 && $button) $part['family'] = ($flags&15);
@@ -811,7 +1076,7 @@ if ($SHOW_PACKAGED_SOLO_STACK)
 <script src=script.js></script>
 <body>
 <div id=container>
-	<modal-dialog class='static frameless closebox loading nodrag' visible=true name="Stack" 
+	<modal-dialog class='static frameless loading nodrag' visible=true name="Stack" 
 		style="--modal-dialog-titlebar-font: 1em Chicago;">
 		<stack-part width=512 height=0><card-part class=current></card-part></stack-part>
 	</modal-dialog>
@@ -836,6 +1101,8 @@ if ($SHOW_PACKAGED_SOLO_STACK)
 
 	if (typeof ImportedICONImages != 'undefined')
 		stack.importedICONs = JSON.stringify(ImportedICONImages);
+	if (typeof ImportedWAVResources != 'undefined')
+		stack.importedWAVs = JSON.stringify(ImportedWAVResources);
 	
 	stack.parentNode.name = json.name;
 	stack.name = json.name;
@@ -887,10 +1154,24 @@ else if (isset($target_srcname))
 	var json=<?php echo json_encode($stack); ?>;
 	if (typeof ImportedICONImages != 'undefined')
 		json['importedICONs'] = JSON.stringify(ImportedICONImages);	// we'll want a 'resource fork' for stacks sometime, probably
-	if (window.top.stack_uploader_json_result) window.top.stack_uploader_json_result(json);
-	else document.write(JSON.stringify(json));
+	if (typeof ImportedWAVResources != 'undefined')
+		json['importedWAVs'] = JSON.stringify(ImportedWAVResources);	// we'll want a 'resource fork' for stacks sometime, probably
+	if (window.top.stack_uploader_json_result) {
+		window.top.stack_uploader_json_result(json);
+	}
+	else document.write("<pre>"+JSON.stringify(json, null, '\t').replaceAll('&','&amp;').replaceAll('<','&lt;')+"</pre>");
 </script>
 	<?php
+		if (isset($_POST['whicharchive']))
+		{
+			echo "Import complete.<br><br>";
+			$friendly_archive_name = preg_replace('/[^A-Za-z0-9\-\_]/', '-', $_POST['whicharchive']);
+			output_archive_picker_form($friendly_archive_name);
+		}
+		else
+		{
+			echo "Import complete. <a href='.'>Import another...</a>";
+		}
 }
 else {
 	/* no solo stack, no upload, just output  json */
