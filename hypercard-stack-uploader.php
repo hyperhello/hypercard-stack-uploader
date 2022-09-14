@@ -29,7 +29,7 @@ header('Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, ma
 echo "<!DOCTYPE html><meta charset=utf-8><meta name=viewport content='width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover'>\n";
 
 /* byte size limit */
-$UPLOAD_BYTES_LIMIT = 15000000;
+$UPLOAD_BYTES_LIMIT = 35000000;
 /* path to move uploaded file */
 $SAFE_STACK_CONVERTER_UPLOADS_DIR = "stack-uploads/";
 /* path to Maconv if you want to open .sit, .dsk, etc */
@@ -48,6 +48,7 @@ if (isset($_GET['show']))
 /* set these to something for testing. otherwise the upload form will take care of it. */
 $filename = "";
 $possible_resource_fork = "";
+$XCMDs_stub_scripts = "";
 $nihongo_translation = isset($_POST['nihongo']);
 
 //	echo "<pre>".shell_exec($MACONV_INSTALLATION_LOCATION."maconv e -h " )."</pre>\n";
@@ -131,24 +132,31 @@ function output_archive_picker_form($friendly_archive_name)
 		return false;
 		echo "<center><h3><font color=red>Could not locate a HyperCard stack file in archive.</font></h3></center>";
 	}
-	else if (count($candidates) > 1)
+	else if (count($candidates) >= 1)
 	{
 		$filename = "";
 		
 		echo "<form method=post>";
 		echo "<input type=hidden name=whicharchive value=\"".htmlspecialchars($friendly_archive_name)."\">";
+		echo " <label><input type=checkbox name=nihongo ".($nihongo_translation ? "checked" : '')."> 日本語</label><br>";
 		echo /*"‘".htmlspecialchars($uploadname)."’"*/ "Archive contains ".count($candidates)." stacks, select one to import:<br>";
 		$first=true;
 		foreach ($candidates as $c)
 			{
-				echo "<label><input type=radio name=whichimport value=\"".htmlspecialchars($friendly_archive_name."/".$c)."\" ".($first ? "checked=true" : "")."> ".$c." (".(round(filesize($maconv_output_folder.'/'.$c)/1000))."K)</label><br>";
+				// the value="" is empty when there is a 'bad' char in the filename.
+				echo "<label><input type=radio name=whichimport value=\"".htmlspecialchars($friendly_archive_name."/".$c)."\" ".($first ? "checked=true" : "")."> ".$c." (".(round(filesize($maconv_output_folder.'/'.$c)/1000))."K) <input type=submit value='Import' onclick=\"this.parentNode.querySelector('input[type=radio]').checked=true;\"> </label><br>";
 				$first = false;
 			}
-		echo "<input type=submit value='Import Selected' style='font: bold 1em system-ui;'>";
-		echo " <label><input type=checkbox name=nihongo ".($nihongo_translation ? "checked" : '')."> 日本語</label>";
+	//	echo "<input type=submit value='Import Selected' style='font: bold 1em system-ui;'>";
 		echo "</form><br>";
 		echo "<a href='.'>Import another...</a>";
 		return true;
+	}
+	else if (count($candidates) == 1)
+	{
+		// i'm not getting the resource fork location correct! so i changed >1 to >=1 above. fix later
+		return $target_file;
+		//return $friendly_archive_name."/".$candidates[0];
 	}
 }
 	
@@ -190,16 +198,27 @@ if (!$filename && isset($_POST['convert']))
 		//print_r($firstlevel);
 		echo "</pre>\n";
 		
-		$picker_form_result = output_archive_picker_form($friendly_archive_name);
-		if ($picker_form_result === false)
-			echo "<center><h3><font color=red>Could not locate a HyperCard stack file in archive.</font></h3></center>";
-		else if ($picker_form_result === true)
-			return;
-		else {
-			$target_srcname = $picker_form_result;
-			$possible_resource_fork = $target_srcname.'.rsrc';
+		if (!is_dir($maconv_output_folder))
+		{
+			echo "<center><h3><font color=red>Could not open “".htmlentities($target_srcname)."”.</font></h3></center>";
 		}
-		
+		else 
+		{
+			$picker_form_result = output_archive_picker_form($friendly_archive_name);
+			if ($picker_form_result === false)
+			{
+				echo "<center><h3><font color=red>Could not locate any HyperCard stack files.</font></h3></center>";
+			}
+			else if ($picker_form_result === true)
+			{
+				return;
+			}
+			else 
+			{
+				$target_srcname = $picker_form_result;
+				$possible_resource_fork = $maconv_output_folder.'/'.$picker_form_result.'.rsrc';	// just changed, maybe work?
+			}
+		}
 		/*function rglob($pattern, $flags = 0) {
 			$files = glob($pattern, $flags); 
 			foreach (glob(dirname($pattern).'/*', GLOB_ONLYDIR|GLOB_NOSORT) as $dir) {
@@ -277,7 +296,7 @@ function testforstackness($target_file)
 	
 	if (!file_exists($target_file) || file_get_contents($target_file, NULL, NULL, 4, 4) != 'STAK')	// i've seen this create a 'is a directory' error with Get Rich Quick . sit
 	{
-		return "<center><h3><font color=red>That doesn't seem to be a stack file.</font></h3></center>";
+		return "<center><h3><font color=red>That doesn't seem to be a HyperCard stack file.</font></h3></center>";
 	}
 	/*else if (unpack("N1", file_get_contents($target_file, NULL, NULL, 16, 4), 0)[1] < 9)
 	{
@@ -293,7 +312,7 @@ function testforstackness($target_file)
 // start by reading in the resources so they're ready to go
 if ($possible_resource_fork && file_exists($possible_resource_fork) && ($contents=file_get_contents($possible_resource_fork)))
 {
-	//echo "Here goes the resource fork read";
+	//echo "Reading resource fork ".$possible_resource_fork."...<br>";
 	/*echo substr($contents, 1048 + 30, 4);
 	echo strlen($contents);
 	echo "\nScanning ".$possible_resource_fork." (".strlen($contents)."b)\n";*/
@@ -335,6 +354,7 @@ if ($possible_resource_fork && file_exists($possible_resource_fork) && ($content
 	}
 	if (isset($types['ICON']))
 	{
+		echo "Found ".count($types['ICON'])." ICON resources...<br>";
 ?>
 <script>
 	var convertedicons = <?php echo json_encode($types['ICON']); ?>;
@@ -465,6 +485,8 @@ if ($possible_resource_fork && file_exists($possible_resource_fork) && ($content
 	
 	if (isset($types['snd ']) && isset($SND2WAV_INSTALLATION_EXECUTABLE))
 	{
+		echo "Found ".count($types['snd '])." SND resources...<br>";
+
 		$wav_resources = Array();
 		
 		setlocale(LC_CTYPE, "en_US.UTF-8");	// escapeshellarg doesn't include utf without it like ƒ .... sigh
@@ -504,6 +526,16 @@ if ($possible_resource_fork && file_exists($possible_resource_fork) && ($content
 </script>
 <?php
 	}
+
+	if (isset($types['XCMD']))
+		foreach ($types['XCMD'] as $x)
+			$XCMDs_stub_scripts .= ("\n\n on ".$x['name']."\n -- XCMD resource ID ".$x['ID']."\nend ".$x['name']);
+		
+	if (isset($types['XFCN']))
+		foreach ($types['XFCN'] as $x)
+			$XCMDs_stub_scripts .= ("\n\n function ".$x['name']."\n -- XFCN resource ID ".$x['ID']."\nend ".$x['name']);
+			
+	//echo "Reading stack data...<br>";
 }
 	
 
@@ -530,20 +562,19 @@ function output_form()
 </script>
 <form method="post" enctype="multipart/form-data" onsubmit="
 	if (!inspectInput(this)) { event.preventDefault(); return false; } 
-	output.innerText += '\nNow uploading file. Please be patient...';
+	output.innerText += '\n<b>Now uploading file. Please be patient...</b>';
 	console.log('Submitting form...'); 
 	return true;">
-	<h3>HyperCard Stack Importer</h3>
-	Select stack to upload (<code>.sit</code>, <code>.dsk</code>, <code>.img</code> or raw file):<br>
+	<h3>💾 HyperCard Stack Importer 📄</h3>
+	<center><label><input type=checkbox name=nihongo> 日本語</label><br><br></center>
+	<div style='text-align: left;'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code>.dsk</code> , <code>.img</code> , <code>.sit</code> , or raw file:<br></div>
 	<input type="file" name="fileToUpload" id="fileToUpload" oninput="
 		if (document.readyState!='complete' || !inspectInput(this.form)) return;
 		if (this.form.onsubmit())
 			this.form.submit();
-		" style="padding: 20px 0px; border: 0.5em dashed gray; border-radius: 1em;">
+		" style="padding: 4em 0px; border: 0.5em dashed gray; border-radius: 0.5em;">
 	<input type="hidden" value="convert" name="convert" id="convert">
 	<input type="submit" value="Upload" name="dosubmit" id="dosubmit">
-	<br>
-	<label><input type=checkbox name=nihongo> 日本語</label>
 </form>
 </center>
 
@@ -561,7 +592,7 @@ $hc1 = (four(16) < 9);
 
 if (!$SHOW_PACKAGED_SOLO_STACK && $contents !== false)
 {
-	echo "Upload successful.<br>Now importing stack. Please be patient...<br>";
+	echo "<b>Now importing stack. Please be patient...</b><br>";
 	flush();
 }
 
@@ -780,17 +811,24 @@ function read_CARDorBKGD_block($i, $size, $isBKGD)
 	if ($i != $partstop) echo "hey different! $i $partstop \n";
 	//echo "contentscount ".$contentscount." size ".$cls." at ".$i."\n";
 	
+	
 	$stop = ($i+$cls);
 	for ($c = 1; $c <= $contentscount; $c++)
 	{
+		//if ($ID == 2973) echo "<br>";
+
 		$cid = two($i,true);		// HC stores positive ID for bg fld, negative for cd fld
 		if (!$isBKGD)
 			$cid = -$cid;	// now it's correct ID for layer, and for the other layer if it's negative
 		
+		//if ($ID == 2973) echo "cid=".$cid."<br>";
+
 		if ($cid < 0)	// bg field text on card, which we store with negative numbers this way
 			$part = Array('$'=>'div', 'slot'=>$cid, 'ID'=>$cid);	
 		else 
 			$part = find($parts, null, $cid);
+		
+		//if ($ID == 2973) echo "part=".print_r($part,true)."<br>";
 		
 		if ($hc1)
 		{
@@ -798,9 +836,13 @@ function read_CARDorBKGD_block($i, $size, $isBKGD)
 			$partcontents = nullstr($i+2);
 			//echo strlen($partcontents).": ".macroman($partcontents)."DONE\n";
 			
-			$part['$$'] = array_map('decodeanddivify', explode("\n",$partcontents));
 			if ($part)
+			{
+				$part['$$'] = array_map('decodeanddivify', explode("\n",$partcontents));
 				find($parts, null, $cid, $part);
+			}
+			
+			//if ($ID == 2973) echo "(hc1) part=".print_r($part,true)."<br>";
 
 			$i += 2 + strlen($partcontents) + 1;
 			continue;
@@ -864,7 +906,7 @@ function read_CARDorBKGD_block($i, $size, $isBKGD)
 
 		if ($part)
 			find($parts, null, $cid, $part);
-		
+
 		$i += $csize + ($csize % 2);
 	}
 	if ($i < $stop) { echo "didn't get to the contents stop by ".($stop-$i)."\n"; }	// is stop wrong or does it leave old data?
@@ -954,8 +996,8 @@ $stack['buttonCSSFont'] = "12px Chicago";
 $stack['fieldCSSFont'] = "12px Geneva";
 
 $scr = nullstr($i+76+2+18+16+328+2+262+320+512);
-if (strlen($scr))
-	$stack['script'] = macroman($scr);
+//if (strlen($scr))
+	$stack['script'] = macroman($scr) . $XCMDs_stub_scripts;
 //print_r($stack);
 
 $fonts = Array();
@@ -1164,13 +1206,14 @@ else if (isset($target_srcname))
 	<?php
 		if (isset($_POST['whicharchive']))
 		{
-			echo "Import complete.<br><br>";
+			echo "✅ Import complete.<br><br>";
 			$friendly_archive_name = preg_replace('/[^A-Za-z0-9\-\_]/', '-', $_POST['whicharchive']);
 			output_archive_picker_form($friendly_archive_name);
 		}
 		else
 		{
-			echo "Import complete. <a href='.'>Import another...</a>";
+			echo "Import complete.<br>";
+			output_form();
 		}
 }
 else {
