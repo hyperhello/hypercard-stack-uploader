@@ -12,7 +12,7 @@ The importer will also import the stacks' resources, using but not including the
 <a href="https://github.com/uliwitness/snd2wav">snd2wav by Uli Kusterer.</a>
  
 LICENSE:
-	This file was developed ©2022 <a href="https://hypervariety.com">Hypervariety Custom Software, LLC</a>. There is no warranty of any kind expressed or implied.
+	This file was developed ©2022 Hypervariety Custom Software, LLC. There is no warranty of any kind expressed or implied.
 	THIS FILE IS OPEN SOURCE. YOU CAN COPY AND RUN THIS FILE YOURSELF AND LEARN PROGRAMMING TECHNIQUES FROM IT.
 	Although the code is not very well-written or pretty, in the interests of public discourse, I am making it available for view. 
 	
