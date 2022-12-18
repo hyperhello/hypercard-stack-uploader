@@ -1789,10 +1789,10 @@ if ($SHOW_PACKAGED_SOLO_STACK)
 	</modal-dialog>
 </div>
 <center id=toolbar>
-	<button-part icon=21449 onclick="wildcard.card = wildcard.stack.firstCard;"></button-part>
+	<button-part icon=21449 onclick="sim.card = sim.stack.firstCard;"></button-part>
 	<select></select>
-	<button-part icon=902 onclick="wildcard.card = wildcard.stack.prevCard;"></button-part>
-	<button-part icon=26425 onclick="wildcard.card = wildcard.stack.nextCard;"></button-part>
+	<button-part icon=902 onclick="sim.card = sim.stack.prevCard;"></button-part>
+	<button-part icon=26425 onclick="sim.card = sim.stack.nextCard;"></button-part>
 </center>
 <div id=output>
 	<button-part style="float: left; margin: 0.25em 0.5em; cursor: pointer;" xfont='1em Chicago' onclick="
