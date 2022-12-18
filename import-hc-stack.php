@@ -20,7 +20,7 @@
 	Then at the end, depending on the flag it either shows the JSON, sends it to the parent window, or puts the stack up on display.
 	
 */
-	
+
 $show_errors = true;
 ini_set('display_errors', $show_errors ? 1 : 0);
 error_reporting($show_errors ? -1 : 0); 	// this is really hard core, in PHP 8 it's the default
