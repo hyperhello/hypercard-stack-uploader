@@ -52,7 +52,7 @@ $RESOURCEDASM_INSTALLATION_EXECUTABLE = null;
 /* path to snd2wav if you want to import type 2 SND resource files and don't have resource_dasm */
 $SND2WAV_INSTALLATION_EXECUTABLE = null;
 /* set to true if you want to show the stack by linking in the xtalk templates from hypercardsimulator.com */
-$SHOW_PACKAGED_SOLO_STACK = false;
+$SHOW_PACKAGED_SOLO_STACK = true;
 /* for testing resources given a local STAK */
 $DEMO_DATAFORK_FILE = "";
 /* for testing resources given a local .rsrc */
@@ -1746,17 +1746,18 @@ if (!$filename)
 	return;
 }
 	
-if (!$SHOW_PACKAGED_SOLO_STACK)
+/*if (!$SHOW_PACKAGED_SOLO_STACK)
 {
 	echo "<body style='padding-bottom: 50%;'>";
 	//echo " <b>Reading stack...</b><br>";
 	flush();
-}
+}*/
 
 $stack = read_STAK_file($filename, $target_srcname);
 
 if ($SHOW_PACKAGED_SOLO_STACK)
 {
+	echo "</div>";
 	/* Output the JSON as HTML and display a set of minimal controls with the templates from Hypercardsimulator.com/script.js */
 ?>
 <base href="https://hypercardsimulator.com/">
@@ -1849,6 +1850,18 @@ if ($SHOW_PACKAGED_SOLO_STACK)
 	select.selectedIndex = 0;
 	select.onchange = function() { stack.card = stack.qsa('card-part')[this.selectedIndex]; }
 	stack.addEventListener('openCard', function() { select.selectedIndex = Array.from(stack.qsa('card-part')).indexOf(stack.card); });
+
+	XTalk.Send(stack.card, 'openStack', [], (proceed)=>{
+		if (proceed)
+			XTalk.Send(stack.card, 'openBackground', [], (proceed)=>{
+				if (proceed)
+					XTalk.Send(stack.card, 'openCard', [], (proceed)=>{
+						stack.lockOpenCardMessages = false;
+					});
+				else stack.lockOpenCardMessages = false;
+			});
+		else stack.lockOpenCardMessages = false;
+	});
 </script>
 
 <?php
