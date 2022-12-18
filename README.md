@@ -9,7 +9,7 @@ The importer will import Mac resourcing using but does not including these libra
 
 <a href="https://github.com/fuzziqersoftware/resource_dasm">resource_dasm is a disassembler for classic Mac OS resource forks.</a>
 
-<a href="https://github.com/uliwitness/snd2wav">
+<a href="https://github.com/uliwitness/snd2wav">snd2wav by Uli Kusterer.</a>
  
 LICENSE:
 	This file was developed ©2022 Hypervariety Custom Software, LLC. There is no warranty of any kind expressed or implied.
