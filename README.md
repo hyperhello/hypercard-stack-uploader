@@ -3,7 +3,7 @@ Imports classic Hypercard stacks directly from archives and exports HTML that ru
 
 <img src="sample-stack.png" />
 
-The importer will import Mac resourcing using but does not including these libraries:
+The importer will import Mac resourcing using but not including these libraries:
 
 <a href="https://github.com/ParksProjets/Maconv">Maconv is a Linux software that can convert all kinds of old Macintosh formats, including MacBinary, Stuffit archives and HFS disk files.</a>
 
