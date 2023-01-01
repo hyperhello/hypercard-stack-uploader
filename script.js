@@ -1,4 +1,4 @@
-/* (c) 2022 Hypervariety Custom Software. All rights reserved. Packaged 2022-12-18 04:59:44 */ 
+/* (c) 2022 Hypervariety Custom Software. All rights reserved. Packaged 2023-01-01 07:25:36 */ 
 
 /* 
 	
@@ -19,12 +19,6 @@ Custom elements included in this package:
 <marching-ants></marching-ants>
 Attributes: inset=0,visible
 
-<modal-dialog></modal-dialog>
-Attributes: name,visible,x,y
-
-<card-window-delegate></card-window-delegate>
-Attributes: scroll,rectangle|rect,width,height
-
 <xtalk-common-template></xtalk-common-template>
 Attributes: name='',script=''
 
@@ -32,7 +26,7 @@ Attributes: name='',script=''
 Attributes: width=512,height=342,tool=Browse,visualEffect='',importedICONs,importedICONResources,importedWAVs,importedPLTEs,importedPICTs,importedCURSs,importedColorData,buttonCSSFont,fieldCSSFont
 
 <card-or-background-template></card-or-background-template> inherits from xtalk-common-template
-Attributes: color,ID=0,dontSearch=false,cantDelete=false,showPict=true,bitmap,addColorData
+Attributes: color,ID=0,dontSearch=false,cantDelete=false,showPict=true,bitmap,addColorData=''
 
 <card-part></card-part> inherits from card-or-background-template
 Attributes: marked=false,bkgndID=0
@@ -46,7 +40,19 @@ Attributes: id,visible=true,topLeft,width,height,textHeight,textAlign='',textFon
 Attributes: type,scroll=0,lockText=false,dontWrap=false,autoSelect=false,sharedText=false,multipleLines=false,wideMargins=true,fixedLineHeight=false,showLines=false
 
 <button-part></button-part> inherits from button-or-field-template
-Attributes: type=transparent,hilite=false,autoHilite=true,sharedHilite=true,family='',showName=true,enabled=true,icon=0,selectedLine=0
+Attributes: type=transparent,hilite|highlight|highlite|hilight=false,autoHilite=true,sharedHilite=true,family='',showName=true,enabled=true,icon=0,selectedLine=0
+
+<title-bar-menu></title-bar-menu>
+Attributes: name,show=false
+
+<title-bar-menuitem></title-bar-menuitem>
+Attributes: contents,markChar,menuMessage|menuMsg
+
+<modal-dialog></modal-dialog>
+Attributes: name,visible,x,y
+
+<card-window-delegate></card-window-delegate>
+Attributes: scroll,rectangle|rect,width,height
 
 <packaged-answer-and-ask-boxes></packaged-answer-and-ask-boxes>
 
@@ -67,7 +73,7 @@ if (typeof n !== 'boolean') {
 var nn = Number(n);
 if (!isNaN(nn)) return nn;
 }
-throw Error("Expected number here: " + n);
+throw Error("Expected a number here but found " + tickedString(n));
 }
 function boolean(n)
 {
@@ -76,23 +82,23 @@ if (typeof n==='string') {
 if (n.toLowerCase()==='true') return true;
 if (n.toLowerCase()==='false') return false;
 }
-throw Error("Expected true or false here: " + n);
+throw Error("Expected a true or false here but found " + tickedString(n));
 }
 function point(value)
 {
 if ((value=String(value).split(',').map((v)=>number(v))) && value.length==2)
 return value;
-throw Error("Expected point here: " + value);
+throw Error("Expected a point here but found " + tickedString(value));
 }
 function rectangle(value)
 {
 if ((value=String(value).split(',').map((v)=>number(v))) && value.length==4)
 return value;
-throw Error("Expected rectangle here: " + value);
+throw Error("Expected a rectangle here but found " + tickedString(value));
 }
 
 
-function tickedString(str) { return "`" + str.replaceAll("\\","\\\\").replaceAll("`","\\`").replaceAll("${","$\\{") + "`"; }
+function tickedString(str) { return "`" + String(str).replaceAll("\\","\\\\").replaceAll("`","\\`").replaceAll("${","$\\{") + "`"; }
 
 /* call new XTalk(me, script).
 it will create a script tag either in me.shadowRoot or document.head, and attach itself as me.xTalk. */
@@ -125,14 +131,13 @@ transpile_line(line, index);
 function handlername(handler, withDollars)
 { return (withDollars ? '$$$' : '') + handler.type + '_' + handler.name + (withDollars ? '$$$' : ''); }
 
-var coroutines = `"use strict"; XTalk.InitCoroutinesFor('` + xtalk_id + "', function " + xtalk_id + '(me) {\n'
-+ handlers.map((h)=>h.coroutine).join('\n')
-+ '\nreturn { '
+var coroutines = `"use strict"; XTalk.InitCoroutinesFor('` + xtalk_id + "', function " + xtalk_id + '(me) {\n';
+handlers.forEach((h)=>{ h.jLine = coroutines.split('\n').length; coroutines += h.coroutine + '\n'; });
+coroutines += '\nreturn { '
 + 'handlers: { ' + handlers.filter((h)=>h.type=='on').map((h)=>h.name + ':' + handlername(h,true)).join(', ') + ' }, '
 + 'functions: { ' + handlers.filter((h)=>h.type.toLowerCase()=='function').map((h)=>h.name + ':' + handlername(h,true)).join(', ') + ' } '
 + ' };'
 + '\n});';
-//console.log(coroutines);
 
 this.raw = { handlers, lineinfo };
 
@@ -160,15 +165,12 @@ console.log(e, coroutines, this.scriptTag);
 
 XTalk.warned_this_time = false;
 
-function topembed()
-{
-return embed[embed.length-1];
-}
 function transpile_line(line, index)
 {
-var example;
+var example = { count: 0 };
 XTalk.Examples = (XTalk.Examples || {});
-var example = XTalk.Examples[line] = (XTalk.Examples[line] || { count: 0 });
+if (!options.lineRule)	// don't save example in the message box or anywhere with different parsing rule
+example = XTalk.Examples[line] = (XTalk.Examples[line] || example);
 
 var error = null, match = /^[\s]*(on|function|end)[\s]+([A-Z0-9_]+)[\s]*((([A-Z0-9_]+)[\s]*[,]?[\s]*)*)[\s]*/giy.exec(line);
 if (match && (match[1].toLowerCase()=='on' || match[1].toLowerCase()=='function'))
@@ -189,12 +191,6 @@ lineinfo.push({ indent: 0, error: line.trim() && (line.trim().substr(0,2)!='--')
 }
 else if (match && (match[1].toLowerCase()=='end') && (handler.name.toLowerCase()==match[2].toLowerCase()))
 {
-if (topembed() && topembed().substr(-1) == '?')
-embed.pop();
-
-if (topembed())
-error = 'Unsatisfied embed ' + embed;
-
 commit_handler();
 handler = null;
 lineinfo.push({ indent: 0, error });
@@ -204,7 +200,7 @@ else
 XTalk.CurrentHandler = handler.name;
 var o = '', cluematch = null, error = null, fallback = null;
 if (example.count)
-o = example.js;	// very fast but only good if scriptline -> javascript is totally consistent
+o = example.js;	// very much faster but only good if [and it is] scriptline -> javascript is totally consistent.
 else if (line.trim())
 o = XTalk.Translate(options.lineRule || 'handler-line', line)
 delete XTalk.CurrentHandler;
@@ -221,76 +217,26 @@ o = '';//handler.type + ' ' + handler.name + ' line ' + (handler.code.length+1) 
 if (options.fallbackToJS && line)
 o = fallback = line;
 else if (line.trim())
-error = "Can't understand ‘" + line.trim() + "’.";
+error = "Can't understand ‘" + line.trim() + "’";
 //error = "throw 'Cant understand ' + " + tickedString(line) + ";";
-}
-else if (cluematch=/^(\/\*([A-Za-z\}=?]+)\*\/)?[\s]*(\})?/g.exec(o.trim()))
-{
-if (stripembeds)
-o = o.substr((cluematch[0]||'').length - (cluematch[3]||'').length);
-//console.log(cluematch,thisembed,cluematch[2],thisembed.substr(0,thisembed.length-1));
-var myembed = cluematch[2];
-//if (myembed == 'repeat') debugger; // if}=else
-//if (myembed == 'if}=else') debugger;
-if (myembed && myembed.split('=')[1]) {	// found =name, so stack had better be name= or name?
-if (topembed() && myembed.split('=')[1]==topembed().substr(0,topembed().length-1))
-embed.pop();	// satisifed
-else if (topembed() && topembed() == myembed.split('}=')[0]) {	// a special case of make sure there's a close bracket
-embed.pop();
-if (!cluematch[3])
-o = (cluematch[3]='} ') + o;	// literally add it in.
-}
-else if (embed.includes(myembed.split('=')[0]))
-{ }	// fine carry on
-else
-/*console.log*/(error=(/*'Embed ' +*/ myembed + ' did not satisfy ' + embed), line);
-}
-else if (myembed) {	// found nonpuncuated embed; it must be on the stack
-if (cluematch[3] && topembed() != myembed.split('=')[0]) {
-if (!topembed() || topembed().substr(-1) != '?')
-{ /*console.log*/(error=(/*'Closing embed ' +*/ myembed + ' did not satisfy ' + embed), line); o = '//' + o; }
-else embed.pop();
-}
-else if (!embed.includes(myembed.split('=')[0]))
-/*console.log*/(error=(/*'Nonpuncuated Embed ' +*/ myembed + ' did not satisfy ' + embed), line);
-
-if (cluematch[3])
-embed.pop();
-//else
-//	o = (cluematch[3]='} ') + o;	// literally add it in.
-}
-
-if (!error && cluematch[3])
-indent--;
 }
 
 if (!o.trim())	// all comment or empty
 {}
-else if (topembed() && topembed().substr(-1)=='=')
-{ error = 'Unsatisfied embed ' + embed; indent = 0; }
-else if (topembed() && topembed().substr(-1)=='?')
-{ embed.pop(); }
 
 lineinfo.push({ indent, error });
 if (error && !options.dontComplain)
-console.log((me && me.closest('stack-part') && (me.closest('stack-part').name+': ') || '')+ error + ' in ' + handler.name);
+console.log((me && me.closest && me.closest('stack-part') && (me.closest('stack-part').name+': ') || '')+ error + ' in ' + handler.name);
 
 if (o !== undefined && (cluematch=/(\{)?[\s]*(\/\*([=]?[A-Za-z]+[=?]?)\*\/)?$/g.exec(o.trim())))
 {
-var myembed = cluematch[3];
-if (stripembeds){ //console.log(cluematch, o);
-o = o.substr(0, o.length - ((cluematch[0]||'').length-(cluematch[1]||'').length));
-//console.log(o);
-}
 
 if (cluematch[1])
 indent++;
-if (myembed)
-{ embed.push(myembed); }
 }
 
 if (error)
-o = "throw new Error(" + tickedString(error) + ");";
+o = "throw Error(" + tickedString(error) + ");";
 
 handler.script.push(fallback ? '' : line);
 handler.code.push(o);
@@ -299,9 +245,9 @@ handler.code.push(o);
 
 function commit_handler()
 {
-var forcefix = "";
-//while (topembed() && topembed().substr(-1) != '?' && topembed().substr(-1) != '!')
-//	{ forcefix += '} /* forced ' + topembed()  + ' */ \n'; console.log(embed.pop()); }
+var flowResult = performFlowAnalysis(handler.code);
+flowResult.indent.forEach((depth,i)=>lineinfo[handler.line+1+i].indent = depth+1);
+//	if (flowResult.indent.find((i)=>i!=0)) debugger;
 
 var param_json = handler.params.split(',').map((p,i)=>{
 return (p=p.trim()) ? "'"+p.toLowerCase()+"':"+/*p*/i+"<arguments.length?arguments["+i+"]:''" : '';
@@ -329,10 +275,10 @@ return "// " + " ".repeat(lineinfo[i].indent) + s.trim()
 + " ".repeat(lineinfo[i].indent) + handler.code[i].substr(0,openbrace) + ((isclosebrace||options.dontYield) ? "" : "yield(" + ((uniqueHandlerID << 16) + i+1) + "); ") + handler.code[i].substr(openbrace)
 + '\n';
 }).join('')
-+ forcefix
-+ 'return "";'
-+ '} catch(e) {(e instanceof Error ? e : (e=new Error(e)))._ = _; throw e;}'
-+ '}\n';	// this causes Firefox's built in linter to bug out when preceded with a 'return' script line
++ flowResult.autoclose
++ ' return "";'
++ '} catch(e) {((e=e instanceof Error?e:new Error(e))._=e._||[]).push({_,$:this,id:'+uniqueHandlerID+'});throw e;}'
++ '}\n';	// this causes Firefox's built in linter to bug out when preceded with 'exit handler' script line
 
 try {
 // I thought this was an acid test. But Function("()=>yield*1") didn't trigger.
@@ -345,7 +291,7 @@ catch(e) {
 //console.log(handler.coroutine);
 XTalk.warned_last_time = XTalk.warned_this_time = true;
 if (body.classList.contains('javascript'))
-console.log(me.longName + ' ' + (me.owner) + ' ' + handler.name + ' line ' + e.line + ' ' + e, handler.script, handler);
+console.log(me.longName + ' ' + (me.owner) + ' ' + handler.name + ' line ' + e.line + ' ' + e, handler.script, handler.coroutine, handler);
 else
 console.log(me.longName + ' ' + (me.owner) + ' ' + handler.name + ' line ' + e.line + ' ' + e, handler.coroutine.split('\n')[e.line*2-1], handler.coroutine);
 
@@ -354,7 +300,141 @@ handler.coroutine = 'function*' + handlername(handler,true) + '(' + ') { }\n';
 
 handlers.push(handler);
 }
+
+function performFlowAnalysis(coroutine)
+{
+// given array of JS, strip the double-comments, find indent
+var flowstack = [], result = { indent: [], errors: [], autoclose: '' };
+
+for (var i = 0; i < coroutine.length; i++)
+{
+var line = coroutine[i], depth = flowstack.filter((fsf)=>fsf[1]=='?!').length;
+
+if (line.trim().length)
+{
+var reg = /(\/\*([^\*]*)\*\/)([^\/]*?)(\/\*([^\*]*)\*\/)/g, match, matches = [], charadjust = 0;
+
+while (match=reg.exec(line))
+matches.push([match[2],match[3],match[5],match.index,reg.lastIndex]);
+if (matches.length==0) {
+autoclose = adjuststack('', '', true, false, i);
+//if (autoclose) line = autoclose + ' ' + line;
+if (autoclose) coroutine[i-1] += autoclose;
 }
+else for (var m = 0; m < matches.length; m++)
+{
+var autoclose = adjuststack(matches[m][0].trim(), matches[m][1], (m==0), i);
+//if (autoclose) { line = autoclose + ' ' + line; charadjust -= autoclose.length; }
+if (autoclose) coroutine[i-1] += autoclose;
+if (m==0) depth = flowstack.filter((fsf)=>fsf[1]=='?!').length;
+autoclose = adjuststack(matches[m][2].trim(), matches[m][1], false, i);
+
+line = line.substr(0,matches[m][3]-charadjust) + matches[m][1] + line.substr(matches[m][4]-charadjust);
+charadjust += (matches[m][4]-matches[m][3]) - matches[m][1].length;
+}
+}
+
+result.indent.push(depth);
+coroutine[i] = line;
+}
+
+while (flowstack.length && flowstack[flowstack.length-1][1]=='?')
+result.autoclose += flowstack.pop()[2];
+
+if (flowstack.length)	// this is a script error
+result.errors.push(['leftover flowstack', flowstack]);
+
+// this would mean a problem with the flow analysis (or means there's a brace in a quoted string)
+var lb = 0, rb = 0, county = (coroutine.join('\n') + result.autoclose).split('').map((c)=>{ if (c=='{') lb++; else if (c=='}') rb++; });
+if (lb!=rb)
+console.warn(coroutine.join('\n'), lb + ' left braces, ' + rb + ' right braces' + (lb==rb ? '....good' : '  WARNING '));
+
+return result;
+
+function adjuststack(command, sourcetext, linestart, lineindex)
+{
+var prefix = '', suffix = '', autoclose = '', inner = command;
+
+if (inner[0]=='+' || inner[0]=='-')
+{ prefix = inner[0]; inner = inner.substr(1); }
+if (inner.substr(-1)=='!')
+{ suffix = '!'; inner = inner.substr(0,inner.length-1); }
+if (inner.substr(-1)=='?')
+{ suffix = '?'+suffix; inner = inner.substr(0,inner.length-1); }
+if (inner.substr(-1)=='}')
+{ autoclose = '}'; inner = inner.substr(0,inner.length-1); log('found autoclose'); }
+
+//console.log([prefix, inner, suffix, command, sourcetext]);
+var didRemove, top = flowstack[flowstack.length-1], executed_autoclose = '';
+
+function log() { if (false) console.log(...arguments); }
+
+if (prefix == '-') {
+if (top && top[0].split(',').includes(inner)) {
+flowstack.pop();
+//executed_autoclose += top[2];
+top = flowstack[flowstack.length-1];
+didRemove = inner;
+log('executed ' + command, flowstack);
+}
+else {
+// don't complain yet
+//console.warn('cannot execute ' + command, flowstack);
+}
+}
+
+if (linestart) {
+if (top && top[1]=='?') {
+if (/*top[0]!=*/!didRemove) {
+flowstack.pop();
+executed_autoclose += top[2];
+log('forgot ' + top, flowstack);
+top = flowstack[flowstack.length-1];
+}
+}
+else if (top && top[1]=='?!') {
+log('allowed ' + top, flowstack);
+}
+else if (top) {
+result.errors.push({ line: lineindex, error: 'unsatisfied ' + top });
+console.warn('unsatisfied ' + top, flowstack);
+}
+}
+
+if (prefix == '-' && !didRemove) {
+if (top && top[0].split(',').includes(inner)) {
+flowstack.pop();
+//executed_autoclose += top[2];
+top = flowstack[flowstack.length-1];
+didRemove = true;
+log('executed ' + command, flowstack);
+}
+else {
+// this time complain
+result.errors.push({ line: lineindex, error: 'cannot execute ' + command });
+console.warn('cannot execute ' + command, flowstack);
+}
+}
+
+if (prefix == '+') {
+flowstack.push([inner,suffix,autoclose]);
+log('executed ' + command, flowstack);
+}
+else if (prefix == '@') {
+if (!flowstack.find((fsf)=>fsf[0].split(',').includes(inner))) {
+result.errors.push({ line: lineindex, error: 'inappropriate ' + top });
+log('inappropriate ' + top, flowstack);
+}
+else
+log('allowed ' + top, flowstack);
+}
+
+if (executed_autoclose) log('returning autoclose ' + executed_autoclose);
+return executed_autoclose;
+}
+}
+}
+
 remove()
 {
 // what if a script sets its own script while it's running!??!!
@@ -372,9 +452,9 @@ if (me && me.closest)
 me = me.closest('background-part') || me;
 return (me && (me.clone_of||me).closest && (me.clone_of||me).closest('stack-part')) || (!nullOK && sim.stack) || undefined;
 }
-selectOf(selector,byID,numberOrName,container)
+selectOf(selector,byID,numberOrName,container,nullIsOK)
 {
-return XTalk.SelectOf(selector,byID,numberOrName,container);
+return XTalk.SelectOf(selector,byID,numberOrName,container,nullIsOK);
 }
 parentOf(me)
 {
@@ -396,6 +476,7 @@ this.stateChangeWatcher(inprocess);
 }
 push(message, target, params = [], callback, options = {})
 {
+// pushed tasks don't use the dynamic message queue
 this.queue.push({ message, target, params, callback, options });
 if (this.queue.length == 1)
 { this.stateChange(true); this.start(); }
@@ -457,8 +538,8 @@ var debuggedhandler = XTalk.DebugLocMap[debugloc >> 16];
 console.warn(error);	// it would be nice to show local variables and stuff here...
 if (!debuggedhandler)
 return;
-if (XTalk.DebugScriptErrors)
-console.log(debuggedhandler.xtalk);
+if (body.classList.contains('javascript'))
+console.log(debuggedhandler);
 if (debuggedhandler.errorProc)
 debuggedhandler.errorProc(debuggedhandler.line + 1 + (debugloc & 0xFFFF), error);
 else if (XTalk.DebugScriptErrors)
@@ -477,6 +558,13 @@ launch_scripteditor(debuggedhandler.xtalk.me, debuggedhandler.line + 1 + (debugl
 {
 var task, handler, iterator;
 
+/*if (!target.xTalk.init)
+{
+// weird, but we'll do it
+console.log(Object.keys(XTalk.UninitedXTalks).length + ' xTalks waiting to init, delaying run 10ms');
+yield (10);
+}*/
+
 _findNextTask: while (task=this.queue[0])
 {
 // find the next task to work on
@@ -491,10 +579,11 @@ else
 var target = task.options.sendToCurrentCard ? sim.stackOf(target).card : task.target;
 while ( !target.xTalk && (target=XTalk.ParentOf(target)))
 { }
-if (!target || !(handler=target.xTalk.handlers[task.message]))	// .handlers is a proxy that searches for us
+if (!target || !(handler=target.xTalk.handlers[task.message]))
 {
+// it went all the way through the normal hierarchy and wasn't caught at all
 if (task.callback)
-(task.callback)(task.options.successToNotCatch);	// maybe get rid of successToNotCatch. HC let you send or pass it and it would not error
+(task.callback)(task.options.successToNotCatch);
 
 this.queue.shift();
 continue _findNextTask;
@@ -540,6 +629,10 @@ catch (error)
 {
 task.debugloc = debugloc;
 
+var debuggedhandler = XTalk.DebugLocMap[debugloc >> 16];
+if (debuggedhandler)
+error.scriptline = debuggedhandler.line + 1 + (debugloc & 0xFFFF);
+
 if (error === XTalk.exitToHyperCard)
 next = { done: true, value: '' };
 else
@@ -572,7 +665,7 @@ XTalk.DebugLocMap = {};		// could make this use weak references?
 
 XTalk.ScriptWasChanged = ()=>{};	// when a script changes or when the script editor hides or shows
 
-XTalk.cu = (what) => { throw new Error("Can't understand ‘"+what+"’."); };
+XTalk.cu = (what) => { throw new Error("Can't understand ‘"+what+"’"); };
 XTalk.exitToHyperCard = new Error("exit to hypercard");
 
 XTalk.UniqueID = 1;
@@ -585,25 +678,44 @@ const me = xtalk.me;
 if (!me) throw "Unknown xtalk_id " + xtalk_id;
 delete XTalk.UninitedXTalks[xtalk_id];
 
+// here's the place to add the dynamic path, which means that if a message has no takers at all in the message path it's in, it gets to try the current card + background (if different).
+// for this to be valid in HC, the message has to start in a card, button, or field, be uncaught at all, and the go command has to have been in *that* handler.
+// we'll just make sure the message is uncaught, originates in a card, button, or field, and <--- is not the current.
+
 const MessagePath = (list, ofFunctions) => {
 list = Object.fromEntries(Object.entries(list).map((e)=>[e[0].toLowerCase(), e[1].bind(xtalk)]));
+xtalk.raw[ofFunctions ? 'fList' : 'hList'] = list;
 return new Proxy(list, {
 get(target,property) {
 var result = Reflect.get(target, property);
-if (result===undefined && typeof property==='string' && property.toLowerCase() !== property)	// we're looking for a lower case version?? what if it's actually uppercase?
+if (result !== undefined)
+return result;
+
+if (typeof property==='string' && property.toLowerCase() !== property)	// look for lower case version? have to see if it works oppositely
 result = Reflect.get(target, property.toLowerCase());
 if (result===undefined) {
-
 var search = xtalk.treat_as_accessory ? me : XTalk.ParentOf(me);
 while (search) {
-if (search.xTalk) {
-result = (ofFunctions ? search.xTalk.functions[property] : search.xTalk.handlers[property]); 	// just search parent, which will search its parent etc.
+if (search.xTalk && (result=(ofFunctions ? search.xTalk.raw.fList[property.toLowerCase()] : search.xTalk.raw.hList[property.toLowerCase()])))
 break;
-}
 search = XTalk.ParentOf(search);
 }
-if (!search)
-console.log('no messagepath result for '+property+' via '+(xtalk.treat_as_accessory ? 'accessory' : me));
+if (!search) {
+// 'me' is not accurate here because the first element in the chain with an xTalk is the one XTalkQueue calls to.
+// And anyway we're catching built in messages in the simulator script now.
+//console.log('no messagepath result for '+property+' via '+(xtalk.treat_as_accessory ? 'accessory' : me.longName));
+if (!xtalk.treat_as_accessory /*&& ['BUTTON-PART','FIELD-PART','CARD-PART','BACKGROUND-PART'].includes(me.nodeName)*/)
+{
+//console.log('handler ' + property + ' requested in ' + me.longName + ' could go through dynamic msg path');
+// don't need to check if the card or background changed because it wasn't caught the first time anyway
+var stack = sim.stackOf(me);
+if (!((search=stack.card).xTalk && (result=search.xTalk.raw[ofFunctions?'fList':'hList'][property.toLowerCase()])))
+(search=stack.background).xTalk && (result=search.xTalk.raw[ofFunctions?'fList':'hList'][property.toLowerCase()]);
+if (result)
+console.log((ofFunctions?'function ':'on ') + property + ' was found in ' + search.longName + ' via the dynamic path');
+// great, you got it working. one issue: a card button, if sent after 'go', would try its own card first as expected. but a bkgnd button, if sent after 'go', would simply try the stack's current card. A message to a background part needs to somehow know what 'card' it is travelling through. Do we add the current card to XTalkQueue.Active to pick in XTalk.ParentOf? This is the same mechanism that 'send to bg btn of card' would use.
+}
+}
 }
 return result;
 },
@@ -613,10 +725,10 @@ return Reflect.has(target, (typeof property==='string') ? property.toLowerCase()
 });
 }
 
-var exec = (coroutines_proc)(me);
+xtalk.init = (coroutines_proc)(me);
 //xtalk.pathFactory = xtalk_message_path_iterator_factory(me);
-xtalk.handlers = MessagePath(exec.handlers, false);
-xtalk.functions = MessagePath(exec.functions, true);
+xtalk.handlers = MessagePath(xtalk.init.handlers, false);
+xtalk.functions = MessagePath(xtalk.init.functions, true);
 //console.log(me.xTalk);
 }
 
@@ -633,18 +745,18 @@ var do_xtalk = new XTalk(target, 'on do_coroutine\n' + scriptLines + '\n\nend do
 (do_xtalk.stackOf() ? do_xtalk.stackOf().queue() : new XTalkQueue()).push('do_coroutine', target, [], callback, { alternate_XTalk: do_xtalk });
 }
 
-XTalk.DoCoroutine = function*DoCoroutine(parent_, script, target)
+XTalk.SendCoroutine = function*SendCoroutine(parent_, script, target)
 {
 // send string to target
-var do_xtalk = new XTalk(target, 'on do_coroutine\n' + script + '\nreturn the result\nend do_coroutine', { treat_as_accessory: true });
-var result = yield*do_xtalk.handlers.do_coroutine(parent_);		// HC uses local variables
+var do_xtalk = new XTalk(target, 'on send\n' + script + '\nreturn the result\nend send', { treat_as_accessory: true });
+var result = yield*do_xtalk.handlers.send(parent_);		// HC uses local variables
 return result;
 }
 
 function*xtalk_do_coroutine(self, _, expression)
 {
 var f = new ((function*(){}).constructor)( '_', XTalk.Translate('scriptLine', expression) );
-yield*(f.bind(self))(_);
+yield*(f.bind(self))(_ || new XTalk.EchoProxy({}));
 }
 function*xtalk_value_coroutine(self, _, expression)
 {
@@ -669,51 +781,6 @@ return;
 return yield*(target.xTalk.handlers[message]||XTalk.cu(message)).apply(null, params);
 }
 
-/*XTalk.SendCoroutine = function*SendCoroutine(message, params=[], target)
-{
-var newtarget = target, oldtarget = XTalk.Target, handler;
-while (!target.xTalk || !(handler=target.xTalk.handlers[message]))
-{
-target = XTalk.ParentOf(target);
-if (!target)
-return;
-}
-
-XTalk.Target = newtarget;
-var result = yield*handler.apply(null, params);	// it's a bound function so this doesn't matter
-XTalk.Target = oldtarget;
-return result;
-}*/
-
-/* call this function when a handler begins; every .next().value() provides a new message path you can iterate through */
-/* var factory = xtalk_message_path_iterator_factory(sim.card), path = factory.next().value(); sim.stack.card = sim.stack.nextCard; while (true) { var n = path.next(); console.log(n); if (n.done) break; } */
-/* Where would this be used? XTalkQueue.run() goes down the list of target.xTalk.handlers, but this is not even correct behaviour, because target.xTalk.handlers is a proxy.
-*/
-function*xtalk_message_path_iterator_factory(target)
-{
-var stack = sim.stackOf(target), start_card = stack.card;
-
-while (true) yield (function*xtalk_message_path_iterator()
-{
-var location = target;
-
-while (location)
-{
-yield location;
-location = XTalk.ParentOf(location);
-}
-
-if (stack.card !== start_card)
-{
-yield stack.card;
-if (stack.background !== start_card.background)
-yield stack.background;
-}
-
-return null;
-});
-}
-
 XTalk.ParentOf = function parentOf(me)
 {
 // messages from both card and background buttons and fields go to the card, then background, then stack, then document.
@@ -729,31 +796,78 @@ return sim.stackOf(me);
 
 // simulator supports having a containing field be in the message path.
 layer = me.parentNode && me.parentNode.closest('background-part, card-part, field-part');
-if (layer && layer.nodeName == 'FIELD-PART')
-return layer;
-
-//layer = me.closest('background-part, card-part');
 if (layer)
-return layer.card;
+{
+// this is a little tricky; a background part's ParentOf is the card, not the background. The Card's ParentOf is the background.
+if (layer.nodeName == 'BACKGROUND-PART' && layer.card_for_bkgnd_clone)
+return layer.card_for_bkgnd_clone ;
+return layer;
+}
 }
 return me.parentNode && ((me.parentNode.closest && me.parentNode.closest('stack-part,background-part,card-part,button-part,field-part')) || document);
 }
-XTalk.SelectOf = function selectOf(selector,byID,numberOrName,container)
+XTalk.SelectOf = function selectOf(selector,by,numberOrName,container,allowToBeNull=false)
 {
-// this needs ordinal support for first/last/any card
+function selectorAndAttribute(aName, aValue) {
+var add = '['+aName+'="' + String(aValue).replaceAll('"',"\\22").replaceAll(/[\x00-\x1F]/g,' ') + '" i]';
+if (typeof selector === 'string')
+return selector+add;
+return selector.map((s)=>s+add).join(',');
+}
+
 try {
 if (container.nodeName==='BACKGROUND-PART' && selector.includes('card-part')) {
 selector = selector.replace('card-part','card-part[bkgndID="'+container.ID+'"]');
 container = XTalk.ParentOf(container);
 }
-var n = Number(numberOrName)-1, part = Array.from(container.qsa(selector)).find((f,i)=>byID ? (f.id==numberOrName) : (n==i) || String(numberOrName).localeCompare(f.name,undefined,{sensitivity: 'base' })===0);
+
+var candidates, part, n;
+
+if (by==='ordinal') {
+candidates = (container.qsa(selector));
+
+// there's another function specifically for cards that supports back, forward, next, etc
+if (numberOrName==='last')
+return candidates[candidates.length-1];
+if (numberOrName==='middle')
+return candidates[Math.floor(candidates.length/2)];
+if (numberOrName==='any')
+return candidates[Math.floor(Math.random()*candidates.length)];
+
+if (numberOrName==='number')	// special one for 'the number of '
+return candidates.length;
+
+// otherwise it was really a number like 2
+n = number(numberOrName);
+part = candidates[n-1];
+}
+else if (by==='number') {
+n = number(numberOrName);
+part = (candidates = (container.qsa(selector)))[n-1];
+}
+else if (by==='id') {
+n = number(numberOrName);
+//part = (candidates = Array.from(container.qsa(selector))).find((f,i)=>(f.id==n));
+part = container.qs(selectorAndAttribute('id',n));
+}
+else if (by!=='name' && numberOrName != "" && !isNaN(numberOrName) && Number.isInteger(n=Number(numberOrName))) {
+// if it's not specifically <string> or <number> (even parenthesis), HC searches by index if it looks like a number
+// this makes btn "0" difficult to access. button "99.9" is also button 99.90. Etc
+part = (candidates = (container.qsa(selector)))[n-1];
+}
+else {
+part = container.qs(selectorAndAttribute('name', numberOrName));
+/*n = String(numberOrName);
+part = (candidates = Array.from(container.qsa(selector))).find((f)=>n.localeCompare(f.name,undefined,{sensitivity: 'base' })===0);*/
+}
 if (part) return part;
-//throw "No such " + selector;
 } catch (e) {
 if (e instanceof XTalk.NoSuch) throw e.msg;
 throw e;
 }
-throw new XTalk.NoSuch('No such ' + selector + (byID ? ' id' : '') + ' ' + numberOrName);
+if (!allowToBeNull)
+throw new XTalk.NoSuch('No such ' + selector + (by ? ' '+by : '') + ' ' + numberOrName);
+return null;
 }
 XTalk.CardOf = function cardOf(stack, ordinal, marked, bkgnd)
 {
@@ -795,12 +909,13 @@ init.$global = {};	// list of global variables
 init.$values = (filterFunc)=>Object.entries(init)
 .filter((e)=>e[0][0]!='$')
 .filter(filterFunc || (()=>true))
-.map((e)=>e[0]+'=' + (typeof e[1] == 'number' || typeof e[1] == 'boolean' ? e[1] : '"'+String(e[1]).replaceAll("\n","↵")+'"'))
+.map((e)=>(e[0]=='the_result' ? 'the result' : e[0])+' is ' + (typeof e[1] == 'number' || typeof e[1] == 'boolean' ? e[1] : '"'+String(e[1]).replaceAll("\n","↵")+'"'))
 .join(', ');
+init.$value = (v)=>init[v];
 
 Object.setPrototypeOf(init, XTalk.EchoProxyDefaults);
 
-var proxy = new Proxy(/*lcInit*/init, {
+var proxy = new Proxy(init, {
 get: (target,property) => {
 //console.log('getting ' + property);
 if (typeof property === 'string' && Object.keys(target.$global).find((g)=>g.toLowerCase()===property.toLowerCase())
@@ -826,8 +941,6 @@ has: (target,property) => {
 return Reflect.has(target, (typeof property === 'string') ? property.toLowerCase() : property);
 }
 });
-//proxy.hasTheResult = ()=>(lcInit.the_result!==undefined);
-//proxy.$global = {};
 return proxy;
 }
 
@@ -1040,14 +1153,16 @@ else if (o.rule) {
 var m = matches.findIndex((m)=>(m.rule==o.rule && !m.used));
 if (m == -1)
 m = matches.findIndex((m)=>(m.rule==o.rule));
-if (m == -1)
-production.push('<..' + o.rule + '?..>')
+if (m == -1) {
+production.push('<..' + o.rule + '..>');
+console.log('missing input rule ' + o.rule);
+}
 else {
 production = production.concat(matches[m].out);
 matches[m].used = true;
 }
 }
-else throw "unknown output type " + o;
+else { console.log(o); throw "unknown output type "; }
 });
 out = production;
 }
@@ -1138,7 +1253,7 @@ if (/=>[\s]*$/.test(ge[i]) || /^[\s]*=>/.test(ge[i+1]))
 ge[i] += ge.splice(i+1,1)[0];
 ge = ge.map((g)=>g.split('=>'));
 ge.forEach((s)=>{
-if (!s[0]) return;
+if (!s[0].trim()) return;
 XTalk.Support(rulename, s[0].trim(), s.slice(1).join('=>').trim(), options);
 });
 }
@@ -1157,22 +1272,31 @@ XTalk.ImportGrammar('',`
 
 XTalk.ImportGrammar('statement', `
 
-answer <expression>	with <value> {or|,} <value> {or|,} <value>		=>	(yield*this.handlers.answer(_, <expression>, <value>, <value>, <value>));
-answer <expression>	with <value> {or|,} <value>					=>	(yield*this.handlers.answer(_, <expression>, <value>, <value>, ''));
-answer <expression>	with <value> 							=>	(yield*this.handlers.answer(_, <expression>, <value>, ''));
+answer <expression>	with <factor> {or|,} <factor> {or|,} <factor>		=>	(yield*this.handlers.answer(_, <expression>, <factor>, <factor>, <factor>));
+answer <expression>	with <factor> {or|,} <factor>					=>	(yield*this.handlers.answer(_, <expression>, <factor>, <factor>, ''));
+answer <expression>	with <factor> 							=>	(yield*this.handlers.answer(_, <expression>, <factor>, ''));
 answer <expression>	 										=>	(yield*this.handlers.answer(_, <expression>));
+answer 				 										=>	(yield*this.handlers.answer(_, ''));
+
 ask <expression> with <expression>							=>	(yield*this.handlers.ask(_, <expression>, <expression>));
 ask <expression> 											=>	(yield*this.handlers.ask(_, <expression>, ''));
+ask 			 											=>	(yield*this.handlers.ask(_, '', ''));
+
 get <expression> [into it]									=>	_.it = <expression>;
 #
 go [to] [the] [stack] {home|"home"} [stack]							=>	goHome();
+go [to] [the] [stack] {help|"help"} [stack]							=>	(yield*this.handlers.help());
 | go [to] <card> <endOfScriptLine>			  				=>  (yield*this.stackOf().GoCoroutine(<card>));
-| go [to] {card|cd} <idOrEmpty> <expression> 				=>  (yield*this.stackOf().GoCoroutine(this.selectOf('card-part', <idOrEmpty>, <expression>, this.stackOf())));
-| go [to] <background> 									=>	(yield*this.stackOf().GoCoroutine(XTalk.CardOf(this.stackOf(),1,false,<background>)));
+| go [to] {card|cd} <idOrEmpty> <expression> <endOfScriptLine> 				=>  (yield*this.stackOf().GoCoroutine(this.selectOf('card-part', <idOrEmpty>, <expression>, this.stackOf())));
+| go [to] <background> 										=>	(yield*this.stackOf().GoCoroutine(XTalk.CardOf(this.stackOf(),1,false,<background>)));
+| go back													=>	(yield*go_recent_card_coroutine());
+| go forth													=>	(yield*go_recent_card_coroutine(true));
 | go back													=>	(yield*this.stackOf().GoCoroutine('back'));
+| go forth													=>	(yield*this.stackOf().GoCoroutine('forth'));
 | go [to] <cardOrdinal> 									=>	(yield*this.stackOf().GoCoroutine(XTalk.CardOf(this.stackOf(),<cardOrdinal>)));
-| go [to] stack <expression> [in [a|an] new window]				=>  (yield*this.handlers.goToStack(<expression>));
-| go [to] <partOrEquiv>	 									=>	(yield*this.stackOf().GoCoroutine(<partOrEquiv>));
+| go [to] <partOrEquiv> <endOfScriptLine>	 					=>	(yield*this.stackOf().GoCoroutine(<partOrEquiv>));
+| go [to] [ [<cardOrdinal>|this] {card|cd} [of|in|<idOrEmpty> <identOrExprOf>] ] [stack] [<card>|<background>]- <expression> [in [a|an] new window]	=>  (yield*this.handlers.goToStack(<expression>));
+| go [to] [ [<cardOrdinal>|this] {card|cd} [of|in|<idOrEmpty> <identOrExprOf>] ] [stack] [<card>|<background>]- <factorsWithSpaces> [in [a|an] new window]	=>  (yield*this.handlers.goToStack(<factorsWithSpaces>));
 #
 
 put <expressionWithCommas> into <chunkList> [the] <property> of <part> | set <chunkList> [the] <property> of <part> to <expressionWithCommas>
@@ -1182,30 +1306,31 @@ put <expressionWithCommas> into <chunkList> <partPossessive> <property> <possess
 
 put <expressionWithCommas> into <chunkList> <partPossessive> <property> | set <chunkList> <partPossessive> <property> to <expressionWithCommas> =>	((e,p)=>{ var c = String(p.<property>), r = XTalkChunk(cl, c, [], true); p.<property> = [c.substr(0,r[0]),r[2],e,c.substr(r[1])].join(''); })(<expressionWithCommas>,[<chunkList>],<partPossessive>);
 
-put <expressionWithCommas> into <chunkList> <buttonOrField>	| set <chunkList> <buttonOrField> to <expressionWithCommas> =>  ((e,cl,p)=>{ var c = String(p.contents), r = XTalkChunk(cl, c, [], true); p.contents = [c.substr(0,r[0]),r[2],e,c.substr(r[1])].join(''); })(<expressionWithCommas>,[<chunkList>],<buttonOrField>);
+put <expressionWithCommas> into <chunkList> <partWithContents>	| set <chunkList> <partWithContents> to <expressionWithCommas> =>  ((e,cl,p)=>{ var c = String(p.contents), r = XTalkChunk(cl, c, [], true); p.contents = [c.substr(0,r[0]),r[2],e,c.substr(r[1])].join(''); })(<expressionWithCommas>,[<chunkList>],<partWithContents>);
 
 put <expressionWithCommas> into <chunkList> <variable> | set <chunkList> <variable> to <expressionWithCommas> => ((e,cl)=>{ var c = String(_.<variable>), r = XTalkChunk(cl, c, [], true); _.<variable> = [c.substr(0,r[0]),r[2],e,c.substr(r[1])].join(''); })(<expressionWithCommas>, [<chunkList>]);
 
-set [the] {textFont|textSize|textStyle|textHeight} of <extratext>		=> null;
-set [the] menuMsg of <extratext> => null;
+set [the] {textFont|textSize|textStyle|textHeight} of <chunkList> <extratext>		=> null;
 
 put <expressionWithCommas> into [the] <property> of <partOrEquiv> | set [the] <property> of <partOrEquiv> to <expressionWithCommas> 	=>	<partOrEquiv>.<property> = <expressionWithCommas>;
 
 put <expressionWithCommas> into <partPossessive> <property> | set <partPossessive> <property> to <expressionWithCommas>	=>	<partPossessive>.<property> = <expressionWithCommas>;
 
-put <expressionWithCommas> into [the] { {message|msg} [box|window] }				=>	(yield*this.handlers.put(<expressionWithCommas>));
-put <expressionWithCommas> into <part>						=>	<part>.contents = <expressionWithCommas>;
+put <expressionWithCommas> into <menu> with {menuMessages|menuMsgs|menuMessage|menuMsg} <expressionWithCommas>	=> ((menu)=>{ menu.contents = <expressionWithCommas>; menu.menuMessages = <expressionWithCommas>; })(<menu>);
+
+put <expressionWithCommas> into [the] { {message|msg} [box|window] }		=>	(yield*this.handlers.put(<expressionWithCommas>));
+put <expressionWithCommas> into <partWithContents>			=>	<partWithContents>.contents = <expressionWithCommas>;
 put <expressionWithCommas> into <variable> 			 		=>	_.<variable> = <expressionWithCommas>;
 [let] <variable> = <expressionWithCommas> 	 			 	=>	_.<variable> = <expressionWithCommas>;
 
-put <expression> before <chunkList> <part>					=>  ((e,cl,p)=>{ var r = XTalkChunk(cl, p.contents, [], true); p.contents = [p.contents.substr(0,r[0]),r[2],e,p.contents.substr(r[0])].join(''); })(<expression>, [<chunkList>], <part>);
+put <expression> before <chunkList> <partWithContents>		=>  ((e,cl,p)=>{ var r = XTalkChunk(cl, p.contents, [], true); p.contents = [p.contents.substr(0,r[0]),r[2],e,p.contents.substr(r[0])].join(''); })(<expression>, [<chunkList>], <partWithContents>);
 put <expression> before <chunkList> <variable>				=>  _.<variable> = ((e,r)=>[_.<variable>.substr(0,r[0]),r[2],e,_.<variable>.substr(r[0])].join(''))(<expression>,XTalkChunk([<chunkList>], _.<variable>, [], true));
-put <expression> before <part> 								=>	((e,s)=>s.contents = String(e) + s.contents)(<expression>,<part>);
+put <expression> before <partWithContents> 					=>	((e,s)=>s.contents = String(e) + s.contents)(<expression>,<partWithContents>);
 put <expression> before <variable> 							=>	_.<variable> = <expression> + _.<variable>;
 
 put <expression> after <chunkList> <part>					=>  ((e,cl,p)=>{ var r = XTalkChunk(cl, p.contents, [], true); p.contents = [p.contents.substr(0,r[1]),r[2],e,p.contents.substr(r[1])].join(''); })(<expression>, [<chunkList>], <part>);
 put <expression> after <chunkList> <variable>				=>  _.<variable> = ((e,r)=>[_.<variable>.substr(0,r[1]),r[2],e,_.<variable>.substr(r[1])].join(''))(<expression>, XTalkChunk([<chunkList>], _.<variable>, [], true));
-put <expression> after <part>								=>	<part>.contents += <expression>;
+put <expression> after <partWithContents>					=>	<partWithContents>.contents += <expression>;
 put <expression> after <variable> 							=>	_.<variable> = _.<variable> + <expression>;
 
 put <expressionWithCommas>									=> (yield*this.handlers.put(<expressionWithCommas>));
@@ -1213,37 +1338,40 @@ set [the] <property> to <expressionWithCommas>				=>	(yield*(sim.handlers.set<pr
 
 #
 
-delete <chunkList> <buttonOrField>
-=> ((cl,p)=>{ var pc = p.contents, r = XTalkChunk(cl, pc, [], 'includeTrailing'); p.contents=[pc.substr(0,r[0]),pc.substr(r[1])].join(''); })([<chunkList>],<buttonOrField>);
+delete <buttonOrField>										=> ((p)=>p.parentNode.removeChild(p))(<buttonOrField>);
+delete <chunkList> <partWithContents>
+=> ((cl,p)=>{ var pc = p.contents, r = XTalkChunk(cl, pc, [], 'includeTrailing'); p.contents=[pc.substr(0,r[0]),pc.substr(r[1])].join(''); })([<chunkList>],<partWithContents>);
 delete <chunkList> <variable>
 =>  _.<variable> = ((r)=>[_.<variable>.substr(0,r[0]),_.<variable>.substr(r[1])].join(''))(XTalkChunk([<chunkList>], _.<variable>, [], 'includeTrailing'));
 #
 
-<addSubtract> <expression> {to|from} <chunkList> <buttonOrField>			=>  ((e,cl,p)=>{ var r = XTalkChunk(cl, p.contents, [], true); p.contents=[p.contents.substr(0,r[0]),r[2],number(p.contents.substring(r[0],r[1])) <addSubtract> number(e),p.contents.substr(r[1])].join(''); })(<expression>,[<chunkList>],<buttonOrField>);
+<addSubtract> <expression> {to|from} <chunkList> <partWithContents>			=>  ((e,cl,p)=>{ var r = XTalkChunk(cl, p.contents, [], true); p.contents=[p.contents.substr(0,r[0]),r[2],number(p.contents.substring(r[0],r[1])) <addSubtract> number(e),p.contents.substr(r[1])].join(''); })(<expression>,[<chunkList>],<partWithContents>);
 <addSubtract> <expression> {to|from} <chunkList> <variable>				=>  ((e,cl)=>{ var p = String(_.<variable>), r = XTalkChunk(cl, p, [], true); _.<variable> = [p.substr(0,r[0]),r[2],number(p.substring(r[0],r[1]))<addSubtract>number(e),p.substr(r[1])].join(''); })(<expression>,[<chunkList>]);
 <addSubtract> <expression> {to|from} [the] <property> of <part> 		=>	((e,p)=>p.<property>=number(p.<property>) <addSubtract> number(e))(<expression>,<part>);
-<addSubtract> <expression> {to|from} <buttonOrField> 					=>	((e,p)=>p.contents=number(p.contents) <addSubtract> number(e))(<expression>,<buttonOrField>);
+<addSubtract> <expression> {to|from} <partWithContents> 					=>	((e,p)=>p.contents=number(p.contents) <addSubtract> number(e))(<expression>,<partWithContents>);
 <addSubtract> <expression> {to|from} <variable> 							=>	_.<variable> = number(_.<variable>) <addSubtract> number(<expression>);
 
-<multiplyDivide> <chunkList> <buttonOrField> by <expression>			=>  ((e,cl,p)=>{ var r = XTalkChunk(cl, p.contents, [], true); p.contents=[p.contents.substr(0,r[0]),r[2],number(p.contents.substring(r[0],r[1])) <multiplyDivide> number(e),p.contents.substr(r[1])].join(''); })(<expression>,[<chunkList>],<buttonOrField>);
+<multiplyDivide> <chunkList> <partWithContents> by <expression>			=>  ((e,cl,p)=>{ var r = XTalkChunk(cl, p.contents, [], true); p.contents=[p.contents.substr(0,r[0]),r[2],number(p.contents.substring(r[0],r[1])) <multiplyDivide> number(e),p.contents.substr(r[1])].join(''); })(<expression>,[<chunkList>],<partWithContents>);
 <multiplyDivide> <chunkList> <variable>	by <expression>			=>  _.<variable> = ((e,r)=>[_.<variable>.substr(0,r[0]),r[2],number(_.<variable>.substring(r[0],r[1])) <multiplyDivide> number(e),_.<variable>.substr(r[1])].join(''))(<expression>,XTalkChunk([<chunkList>], _.<variable>, [], true));
 <multiplyDivide> [the] <property> of <part> by <expression>  		=>	((p,e)=>p.<property>=number(p.<property>) <multiplyDivide> number(e))(<part>,<expression>);
-<multiplyDivide> <buttonOrField> by <expression>					=>	((p,e)=>p.contents=number(p.contents) <multiplyDivide> number(e))(<buttonOrField>,<expression>);
+<multiplyDivide> <partWithContents> by <expression>					=>	((p,e)=>p.contents=number(p.contents) <multiplyDivide> number(e))(<partWithContents>,<expression>);
 <multiplyDivide> <variable> by <expression>							=>	_.<variable> = number(_.<variable>) <multiplyDivide> number(<expression>);
 
 #
-send <expression> to <partOrEquiv>							=> 	(yield*(XTalk.DoCoroutine(_, <expression>, <partOrEquiv>)));
+send <expression> to hypercard								=> 	(yield*(XTalk.SendCoroutine(_, <expression>, document)));
+send <expression> to <partOrEquiv>							=> 	(yield*(XTalk.SendCoroutine(_, <expression>, <partOrEquiv>)));
 send { <message> | "<message>" } <expressionList> to <partOrEquiv>		=> 	yield*xtalk_send_coroutine('<message>', [<expressionList>], <partOrEquiv>);
 #send { <message> | "<message>" } to <partOrEquiv>			=> 	yield*xtalk_send_coroutine('<message>', [], <partOrEquiv>);
 #send { <message> | "<message>" }							=>  yield*xtalk_send_coroutine('<message>', [], this.me);
-{do|send} <expression> 										=>  yield*xtalk_do_coroutine(this, _, <expression>);
+{do|send} <expression> <endOfScriptLine>					=>  yield*xtalk_do_coroutine(this, _, <expression>);
+do <extratext>												=>  yield*xtalk_do_coroutine(this, _, \`<extratext>\`);
 
 enable <partOrEquiv>										=>	<partOrEquiv>.enabled = true;
 disable <partOrEquiv>										=>	<partOrEquiv>.enabled = false;
 #
 show [the] {message|msg} [box|window]						=>  if (window.messagebox) messagebox_setvisible(true);
 hide [the] {message|msg} [box|window]						=>  if (window.messagebox) messagebox_setvisible(false);
-{show|hide} [the] {menubar|titlebar|scroll window|tool window}						=>  null;
+{show|hide} [the] {menubar|titlebar|scroll window|tool window|pattern window}						=>  null;
 show <partOrEquiv> at <expressionWithCommas>				=>	((p,e)=>{ p.loc = e; p.visible = true; })(<partOrEquiv>,<expressionWithCommas>);
 show {picture|pict} {of|in} <card>						=>  <card>.showPict = true;
 hide {picture|pict} {of|in} <card>						=>  <card>.showPict = false;
@@ -1258,11 +1386,11 @@ show <partOrEquiv>											=>	<partOrEquiv>.visible = true;
 hide <partOrEquiv>											=>	<partOrEquiv>.visible = false;
 #
 select text of <buttonOrField>								=>  getSelection().selectAllChildren(<buttonOrField>.contentsContainer());
-select {text|after|before} [<extratext>]							=>	null;
-select line <expression> {of|in} <buttonOrField>          =>  <buttonOrField>.selectedLine = <expression>;
-select <partOrEquiv>										=>	(yield*this.handlers.select(<partOrEquiv>));
-play <value> <valuesWithSpaces>								=>  (yield*this.handlers.play(<value>, <valuesWithSpaces>));
-visual [effect] <valuesWithSpaces>							=>  this.stackOf().visualEffect = <valuesWithSpaces>;
+select {text|after|before} [<extratext>]					=>	null;
+select line <identOrExprOf> <buttonOrField>        	  		=>  <buttonOrField>.selectedLine = <identOrExprOf>;
+select <buttonOrField>										=>  (yield*this.handlers.select(<buttonOrField>));
+play <factor> <factorsWithSpaces>								=>  (yield*this.handlers.play(<factor>, <factorsWithSpaces>));
+visual [effect] <factorsWithSpaces>							=>  this.stackOf().visualEffect = <factorsWithSpaces>;
 push <card>													=>  this.stackOf().pushCard(<card>);
 pop {cd|card} into <variable>								=>  _.<variable> = String(this.stackOf().popCard());
 pop {cd|card}												=>  (yield*this.stackOf().GoCoroutine(this.stackOf().popCard()));
@@ -1274,61 +1402,85 @@ unmark <card>												=> <card>.marked = false;
 
 global <globalList> 										=>  <globalList>;
 
-doMenu <valuesWithSpaces>									=>  (yield*this.handlers.doMenu(<valuesWithSpaces>));
-choose [the] tool <number> 										=>  (yield*this.handlers.choose(<number>));
-choose [the] <identifier> tool									=>  (yield*this.handlers.choose('<identifier>'));
-click at <expressionWithCommas>	[with <extratext>]			=>  ((p)=>this.stackOf().clickDrag(p[0],p[1],p[0],p[1]))(point([<expressionWithCommas>].join()));
+create menu <factor>											=> this.stackOf().parentNode.getMenu(<factor>,true,true);
+delete menu <factor>											=> this.stackOf().parentNode.deleteMenu(<factor>,true);
+
+doMenu <factorsWithSpaces>									=>  (yield*this.handlers.doMenu(<factorsWithSpaces>));
+{choose [the] tool <factor> | choose [the] <factor> tool}		=>  (yield*this.handlers.choose(<factor>));
+click at <expressionWithCommas>	with <expressionWithCommas>	=>  ((p,m)=>this.stackOf().clickDrag(p[0],p[1],p[0],p[1],m))(point([<expressionWithCommas>].join()),<expressionWithCommas>);
+click at <expressionWithCommas>		=>  ((p)=>this.stackOf().clickDrag(p[0],p[1],p[0],p[1]))(point([<expressionWithCommas>].join()));
 drag from <expressionWithCommas> to <expressionWithCommas> [with <extratext>]	=>  ((p,s)=>this.stackOf().clickDrag(p[0],p[1],s[0],s[1]))(point([<expressionWithCommas>].join()),point([<expressionWithCommas>].join()));
-type <expression>											=>  document.execCommand('insertText',null,<expression>);
+type <expression> [with <expressionWithCommas>]				=>  document.execCommand('insertText',null,<expression>);
 speak <expression> with {voice <expression> | <expression> voice }	=>  (yield*this.handlers.speak(<expression>,<expression>));
 speak <expression> 											=>  (yield*this.handlers.speak(<expression>));
 
-{ flash | lock | unlock | dial | close window | convert | create {menu|menuitem} | delete {menu|menuitem} | picture | start using | stop using | sort | reset menubar | palette } [<extratext>]		=>	null;
+{ flash | lock | unlock | dial | close window | convert | create {menuitem} | delete {menuitem} | picture | start using | stop using | sort | reset {menubar|paint}  } [<extratext>]		=>	null;
+addColor <expressionList>									=> this.stackOf().refreshAddColorStage();
+palette <expression>, <expression>							=> _.the_result = create_palette(JSON.parse(this.stackOf().importedPLTEs||'{}')[<expression>], point(<expression>));
+palette <expression>										=> _.the_result = create_palette(JSON.parse(this.stackOf().importedPLTEs||'{}')[<expression>]);
+
 edit [the] script of <partOrEquiv>							=> launch_scripteditor(<partOrEquiv>);
-#
-{<message> | "<message>"} <expressionList>			=>	_.the_result = (yield*(this.handlers.<message>||XTalk.cu('<message>'))(<expressionList>));
 `);
 
-// nested repeat X times could have production rules to increment the N variable...
+XTalk.ImportGrammar('messageCall',`
+{<message> | "<message>"} <expressionList>					=>	_.the_result = (yield*(this.handlers.<message>||XTalk.cu('<message>'))(<expressionList>));
+`);
+
+XTalk.ImportGrammar('',`
+
+<if> 	= if <expression> <then> 				=> if (boolean(<expression>)) /**/{/* +then */ <then>
+<if> 	= if <expression> 		 				=> if (boolean(<expression>)) /**/{/* +then */
+
+<then> 	= then <if>								=> /* -then *//* +else}? */ <if>
+<then> 	= then <repeat>							=> /* -then *//* +else}? */ <repeat>
+<then> 	= then <scriptLine> <else>				=> /* -then *//**/ <scriptLine> /**//* +else}? */ <else>
+<then> 	= then <scriptLine> 					=> /* -then *//**/ <scriptLine> /**//* +else}? */
+<then> 	= then									=> /* -then *//**/ /**//* +endif,else?! */
+
+<else> 	= else <if>								=> /* -else */}/* */ else <if>
+<else> 	= else <repeat> 						=> /* -else */}/**/ else <repeat>
+<else> 	= else <scriptLine> <else>				=> /* -else */}/**/ else <scriptLine> <else>
+<else> 	= else <scriptLine> 					=> /* -else */}/**/ else { <scriptLine> }
+<else> 	= else 									=> /* -else */}/**/ else  /**/{/* +endif?! */
+
+<endif>	= end if <else>							=> /* -endif */}/**/ <else>
+<endif>	= end if								=> /* -endif */}/**/
+
+<repeat> = repeat while <expression>			=> while (boolean(<expression>)) /**/{/* +repeat?! */
+<repeat> = repeat until <expression>			=> while (!boolean(<expression>)) /**/{/* +repeat?! */
+<repeat> = repeat with <variable> {=|is} <expression> <downToOrTo> <expression>
+=> for (var <variable>$ = <expression>; (_.<variable>=<variable>$) <= <expression>; <variable>$<downToOrTo>) /**/{/* +repeat?! */
+<repeat> = repeat with <factor> {=|is} <expression> <downToOrTo> <expression>
+=> for (var VAR$ = <expression>, CTR$ = <factor>; (_[CTR$]=VAR$) <= <expression>; VAR$<downToOrTo>) /**/{/* +repeat?! */
+<repeat> = repeat forever						=> while (true) /**/{/* +repeat?! */
+<repeat> = repeat [for] <expression> [times]	=> for (var _n=1; _n <= number(<expression>); _n++) /**/{/* +repeat?! */
+<repeat> = repeat								=> while (true) /**/{/* +repeat?! */
+<downToOrTo> = down to => --
+<downToOrTo> = to => ++
+
+<endrepeat> = end repeat <else>					=> /* -repeat */}/**/ <else>
+<endrepeat> = end repeat 						=> /* -repeat */}/**/
+<exitrepeat> = exit repeat						=> /* @repeat *//**/ break;
+<nextrepeat> = next repeat						=> /* @repeat *//**/ continue;
+
+`);
 
 XTalk.ImportGrammar('command', `
-if <expression> then <scriptLine> else <scriptLine>			=>	if (boolean(<expression>)) { <scriptLine> } else { <scriptLine> }
-if <expression> then <scriptLine> else						=>	if (boolean(<expression>)) { <scriptLine> } else { /*if*/
-if <expression> then <scriptLine>							=>	if (boolean(<expression>)) { <scriptLine> } /*else?*/
-if <expression> then										=>	if (boolean(<expression>)) { /*if*/
-if <expression> 											=>	if (boolean(<expression>)) /*then=*/
-then <scriptLine> else <scriptLine>							=>	/*=then*/ { <scriptLine> } else { <scriptLine> }
-then <scriptLine> else										=>	/*=then*/ { <scriptLine> } else { /*if*/
-then <scriptLine> 											=>	/*=then*/ { <scriptLine> } /*else?*/
-then														=>	/*=then*/ { /*if*/
-else <scriptLine>											=>	/*if}=else*/ else <scriptLine>
-else														=>	/*if}=else*/ else { /*if*/
-end if														=>	/*if*/ }
-#
-repeat while <expression>									=>	while (boolean(<expression>)) { /*repeat*/
-repeat until <expression>									=>	while (!boolean(<expression>)) { /*repeat*/
-repeat with <variable> {=|is} <expression> to <expression>		=>	for (var <variable>$ = <expression>; (_.<variable>=<variable>$) <= <expression>; <variable>$++) { /*repeat*/
-repeat with <variable> {=|is} <expression> down to <expression>	=>	for (var <variable>$ = <expression>; (_.<variable>=<variable>$) >= <expression>; <variable>$--) { /*repeat*/
-repeat forever												=>	while(true) { /*repeat*/
-repeat [for] <expression> [times]							=>	for (var _n=1; _n <= number(<expression>); _n++) { /*repeat*/
-repeat 														=>	while(true) { /*repeat*/
-next repeat													=>	/*repeat*/ continue;
-exit repeat		 											=>	/*repeat*/ break;
-end repeat													=>	/*repeat*/ }
+<if> | <then> | <else> | <endif>
+<repeat> | <exitrepeat> | <nextrepeat> | <endrepeat>
 #
 return <expression>											=>	return <expression>;
 exit <handlerName> | return									=>  return "";
-pass <handlerName>											=>  _.the_result=(yield*xtalk_pass_coroutine('<handlerName>', arguments, this.me));
+pass <handlerName>											=>  return (yield*xtalk_pass_coroutine('<handlerName>', arguments, this.me));
 exit to hypercard											=>  throw(XTalk.exitToHyperCard);
 end [<extratext>]											=>  /*unknownEnd*/
 #
-
 wait until <expression>										=>  { console.log('wait until '+\`<expression>\`+'…'); while (!boolean(<expression>)) yield({ timeout: 50 }); console.log('done'); }
 wait while <expression>										=>  { console.log('wait while '+\`<expression>\`+'…'); while (boolean(<expression>)) yield({ timeout: 50 });  console.log('done'); }
 wait [for] <expression> {second|seconds|sec|secs} 			=>  { yield({timeout: number(<expression>)*1000}); }
 wait [for] <expression> [tick|ticks]			 			=>  { yield({timeout: number(<expression>)*1000/60}); }
 #
-{debug | debugger}	[<extratext>]							=> 	debugger;
+debugger;													=>  { if (body.classList.contains('javascript')) debugger; }
 log <part>													=>  console.log(<part>);
 log <expressionList>										=>  console.log(<expressionList>);
 `);
@@ -1336,45 +1488,77 @@ log <expressionList>										=>  console.log(<expressionList>);
 // in HC you could get the name of "cd fld (1+1)" , we support this too
 XTalk.ImportGrammar('partOrEquiv',`
 <part>
-<value>														=>  (yield*( new ((function*(){}).constructor)( '_', 'return '+XTalk.Translate('part', <value>) ).bind(this) )(new XTalk.EchoProxy({})))
+<factor>														=>  (yield*( new ((function*(){}).constructor)( '_', 'return '+XTalk.Translate('part', <factor>) ).bind(this) )(new XTalk.EchoProxy({})))
 `);
 
 XTalk.ImportGrammar('part',`
 me															=>	this.me
 the {selectedPart|selPart}									=>  this.stackOf().selectedPart
-[the] [short|abbreviated|abbrev] target						=>  XTalkQueue.Active.Target
+[the] [short|abbr|abbrev|abbreviated] target						=>  XTalkQueue.Active.Target
 [the] owner of <card>										=>  <card>.owner
 the selection												=>  window.getSelection().toString()
 the palette													=>  this.me.palette
 <buttonOrField>
-[the] {card|cd} window =>             this.stackOf().parentNode.cardWindowDelegate()
+[the] {card|cd} window 										=>  this.stackOf().parentNode.cardWindowDelegate()
 <card>
 <background>
 <stack>
-menu <value> [with {menuMessage|menuMessages|menuMsg|menuMsgs} <expression>]				=>  ({ pretendMenu: true })
-window <value> | {msg} 								=>  ({ pretendWindow: true })
-menuItem <expression> [{of|in} menu <expression>] [with {menuMessage|menuMessages|menuMsg|menuMsgs} <expression>]		=>  ({ pretendMenuItem: true })
-file <value>												=>  ({ pretendFile: true })
+<menu>
+<menuItem>
+window <factor> | {msg} 										=>  ({ pretendWindow: true })
+file <factor>												=>  ({ pretendFile: true })
+`);
+
+XTalk.ImportGrammar('menu',`
+menu <factor>												=> this.stackOf().parentNode.getMenu(<factor>,true)
+`);
+
+XTalk.ImportGrammar('menuItem',`
+<ordinal> menuItem {of|in|from} <menu>						=> (this.selectOf('title-bar-menuitem', 'ordinal', <ordinal>, <menu>, true) || {pretendMenuItem:true})
+menuItem <identOrExprOf> <menu>	[with {menuMessage|menuMessages|menuMsg|menuMsgs} <expression>]			=> (this.selectOf('title-bar-menuitem', '', <identOrExprOf>, <menu>, true) || {pretendMenuItem:true})
+`);
+
+XTalk.ImportGrammar('partWithContents',`
+<buttonOrField>
+<menu>
+<menuItem>
 `);
 
 XTalk.ImportGrammar('buttonOrField',`
-<ordinal> [bg|bkgnd|background] {field|fld} {of|in} <card> 	=> ((o,c)=>c.background.partOf('field-part',o).contentsProxyForCard(c))(<ordinal>,<card>)
-<ordinal> <bgOrCd> {button|btn} {of|in} <partOrEquiv>		=> ((o,p)=>p.<bgOrCd>.partOf('button-part',o))(<ordinal>,<partOrEquiv>)
-<ordinal> <bgOrCd> {button|btn} 							=> ((o,p)=>p.<bgOrCd>.partOf('button-part',o))(<ordinal>,this.stackOf())
-<ordinal> <cdOrBg> {field|fld} {of|in} <partOrEquiv>		=> ((o,p)=>p.<cdOrBg>.partOf('field-part',o))(<ordinal>,<partOrEquiv>)
-<ordinal> <cdOrBg> {field|fld} 								=> ((o,p)=>p.<cdOrBg>.partOf('field-part',o))(<ordinal>,this.stackOf())
-<ordinal> <bgOrCd> {part} {of|in} <partOrEquiv>				=> ((o,p)=>p.<bgOrCd>.partOf('button-part,field-part',o))(<ordinal>,<partOrEquiv>)
-<ordinal> <bgOrCd> {part} 									=> ((o,p)=>p.<bgOrCd>.partOf('button-part,field-part',o))(<ordinal>,this.stackOf())
+<ordinal> [bg|bkgnd|background] {field|fld} {of|in} <card> 	=> ((c)=>this.selectOf('field-part', 'ordinal', <ordinal>, (c=<card>).background).contentsProxyForCard(c))()
+[bg|bkgnd|background] {field|fld} <number> {of|in} <card> 	=> ((c)=>this.selectOf('field-part', 'number', <number>, (c=<card>).background).contentsProxyForCard(c))()
+[bg|bkgnd|background] {field|fld} <string> {of|in} <card> 	=> ((c)=>this.selectOf('field-part', 'name', <string>, (c=<card>).background).contentsProxyForCard(c))()
+[bg|bkgnd|background] {field|fld} <idOrEmpty> <identOrFactorOf> <card> => ((c)=>this.selectOf('field-part', <idOrEmpty>, <identOrFactorOf>, (c=<card>).background).contentsProxyForCard(c))()
 
-[bg|bkgnd|background] {field|fld} <idOrEmpty> <identOrValueOf> <card> => ((e,c)=>{e=this.selectOf('field-part', <idOrEmpty>, <identOrValueOf>, (c=<card>).background); return e.contentsProxyForCard(c); })()
-<bgOrCd> {button|btn} <idOrEmpty> <identOrValueOf> <partOrEquiv>	=>	this.selectOf('button-part', <idOrEmpty>, <identOrValueOf>, <partOrEquiv>.<bgOrCd>)
-<bgOrCd> {button|btn} <idOrEmpty> <value>		 			=>	this.selectOf('button-part', <idOrEmpty>, <value>, this.stackOf().<bgOrCd>)
-<cdOrBg> {field|fld} <idOrEmpty> <identOrValueOf> <partOrEquiv>	=>	this.selectOf('field-part', <idOrEmpty>, <identOrValueOf>, <partOrEquiv>.<cdOrBg>)
-<cdOrBg> {field|fld} <idOrEmpty> <value>					=>	this.selectOf('field-part', <idOrEmpty>, <value>, this.stackOf().<cdOrBg>)
-<bgOrCd> {part} <idOrEmpty> <identOrValueOf> <partOrEquiv>	=>	this.selectOf('button-part,field-part', <idOrEmpty>, <identOrValueOf>, <partOrEquiv>.<bgOrCd>)
-<bgOrCd> {part} <idOrEmpty> <value>		 					=>	this.selectOf('button-part,field-part', <idOrEmpty>, <value>, this.stackOf().<bgOrCd>)
+<ordinal> <bgOrCd> {button|btn} {of|in} <partOrEquiv>				=>  this.selectOf('button-part', 'ordinal', <ordinal>, <partOrEquiv>.<bgOrCd>)
+<ordinal> <bgOrCd> {button|btn} 									=>  this.selectOf('button-part', 'ordinal', <ordinal>, this.stackOf().<bgOrCd>)
+<bgOrCd> {button|btn} <number> {of|in} <partOrEquiv>				=>  this.selectOf('button-part', 'number', <number>, <partOrEquiv>.<bgOrCd>)
+<bgOrCd> {button|btn} <string> {of|in} <partOrEquiv>				=>  this.selectOf('button-part', 'name', <string>, <partOrEquiv>.<bgOrCd>)
+<bgOrCd> {button|btn} <idOrEmpty> <identOrFactorOf> <partOrEquiv>	=>	this.selectOf('button-part', <idOrEmpty>, <identOrFactorOf>, <partOrEquiv>.<bgOrCd>)
+<bgOrCd> {button|btn} <number> 										=>  this.selectOf('button-part', 'number', <number>, this.stackOf().<bgOrCd>)
+<bgOrCd> {button|btn} <string> 										=>  this.selectOf('button-part', 'name', <string>, this.stackOf().<bgOrCd>)
+<bgOrCd> {button|btn} <idOrEmpty> <factor>		 					=>	this.selectOf('button-part', <idOrEmpty>, <factor>, this.stackOf().<bgOrCd>)
 
-me															=>  this.me
+<ordinal> <cdOrBg> {field|fld} {of|in} <partOrEquiv>				=>  this.selectOf('field-part', 'ordinal', <ordinal>, <partOrEquiv>.<cdOrBg>)
+<ordinal> <cdOrBg> {field|fld} 										=>  this.selectOf('field-part', 'ordinal', <ordinal>, this.stackOf().<cdOrBg>)
+<cdOrBg> {field|fld} <number> {of|in} <partOrEquiv>					=>  this.selectOf('field-part', 'number', <number>, <partOrEquiv>.<cdOrBg>)
+<cdOrBg> {field|fld} <string> {of|in} <partOrEquiv>					=>  this.selectOf('field-part', 'name', <string>, <partOrEquiv>.<cdOrBg>)
+<cdOrBg> {field|fld} <idOrEmpty> <identOrFactorOf> <partOrEquiv>		=>	this.selectOf('field-part', <idOrEmpty>, <identOrFactorOf>, <partOrEquiv>.<cdOrBg>)
+<cdOrBg> {field|fld} <number> 										=>  this.selectOf('field-part', 'number', <number>, this.stackOf().<cdOrBg>)
+<cdOrBg> {field|fld} <string> 										=>  this.selectOf('field-part', 'name', <string>, this.stackOf().<cdOrBg>)
+<cdOrBg> {field|fld} <idOrEmpty> <factor>							=>	this.selectOf('field-part', <idOrEmpty>, <factor>, this.stackOf().<cdOrBg>)
+
+<ordinal> <bgOrCd> {part} {of|in} <partOrEquiv>						=> 	this.selectOf(['button-part','field-part'], 'ordinal', <ordinal>, <partOrEquiv>.<bgOrCd>)
+<ordinal> <bgOrCd> {part} 											=> 	this.selectOf(['button-part','field-part'], 'ordinal', <ordinal>, this.stackOf().<bgOrCd>)
+<bgOrCd> {part} <number> {of|in} <partOrEquiv>						=>  this.selectOf(['button-part','field-part'], 'number', <number>, <partOrEquiv>.<bgOrCd>)
+<bgOrCd> {part} <string> {of|in} <partOrEquiv>						=>  this.selectOf(['button-part','field-part'], 'name', <string>, <partOrEquiv>.<bgOrCd>)
+<bgOrCd> {part} <idOrEmpty> <identOrFactorOf> <partOrEquiv>			=>	this.selectOf(['button-part','field-part'], <idOrEmpty>, <identOrFactorOf>, <partOrEquiv>.<bgOrCd>)
+<bgOrCd> {part} <number> 											=>  this.selectOf(['button-part','field-part'], 'number', <number>, this.stackOf().<bgOrCd>)
+<bgOrCd> {part} <string> 											=>  this.selectOf(['button-part','field-part'], 'name', <string>, this.stackOf().<bgOrCd>)
+<bgOrCd> {part} <idOrEmpty> <factor>		 							=>	this.selectOf(['button-part','field-part'], <idOrEmpty>, <factor>, this.stackOf().<bgOrCd>)
+
+me																	=>  this.me
+[the] target														=>  XTalkQueue.Active.Target
 `);
 
 XTalk.ImportGrammar('card',`
@@ -1383,17 +1567,21 @@ XTalk.ImportGrammar('card',`
 [the] <cardOrdinal> marked {card|cd} 						=> 	XTalk.CardOf(this.stackOf(), <cardOrdinal>, true)
 [the] <cardOrdinal> {card|cd} 								=> 	XTalk.CardOf(this.stackOf(), <cardOrdinal>)
 
-marked {card|cd} <idOrEmpty> <identOrValueOf> <background> 	=>	this.selectOf('card-part[marked]:not([marked="false" i])', <idOrEmpty>, <identOrValueOf>, <background>)
-marked {card|cd} <idOrEmpty> <value>						=>	this.selectOf('card-part[marked]:not([marked="false" i])', <idOrEmpty>, <value>, this.stackOf())
-{card|cd} <idOrEmpty> <identOrValueOf> <background> 		=>	this.selectOf('card-part', <idOrEmpty>, <identOrValueOf>, <background>)
-{card|cd} <idOrEmpty> <value>								=>	this.selectOf('card-part', <idOrEmpty>, <value>, this.stackOf())
+marked {card|cd} <string> {of|in} <background> 				=>	this.selectOf('card-part[marked]:not([marked="false" i])', 'name', <string>, <background>)
+marked {card|cd} <idOrEmpty> <identOrFactorOf> <background> 	=>	this.selectOf('card-part[marked]:not([marked="false" i])', <idOrEmpty>, <identOrFactorOf>, <background>)
+marked {card|cd} <idOrEmpty> <factor>						=>	this.selectOf('card-part[marked]:not([marked="false" i])', <idOrEmpty>, <factor>, this.stackOf())
+{card|cd} <string> {of|in} <background> 					=>	this.selectOf('card-part', 'name', <string>, <background>)
+{card|cd} <idOrEmpty> <identOrFactorOf> <background> 		=>	this.selectOf('card-part', <idOrEmpty>, <identOrFactorOf>, <background>)
+{card|cd} <string> 						 					=>	this.selectOf('card-part', 'name', <string>, this.stackOf())
+{card|cd} <idOrEmpty> <factor>								=>	this.selectOf('card-part', <idOrEmpty>, <factor>, this.stackOf())
 
 [the] recent {card|cd}										=>  this.stackOf().recentCard
 [this|the] {card|cd}										=>	this.stackOf().card
 `);
 XTalk.ImportGrammar('background',`
-[the] <cardOrdinal> {background|bkgnd|bg} 		=> 	XTalk.BackgroundOf(this.stackOf(), <cardOrdinal>)
-{background|bkgnd|bg} <idOrEmpty> <value> 		=>	this.selectOf('background-part', <idOrEmpty>, <value>, this.stackOf())
+[the] <cardOrdinal> {background|bkgnd|bg} 					=> 	XTalk.BackgroundOf(this.stackOf(), <cardOrdinal>)
+{background|bkgnd|bg} <string> 								=>	this.selectOf('background-part', 'name', <string>, this.stackOf())
+{background|bkgnd|bg} <idOrEmpty> <factor> 					=>	this.selectOf('background-part', <idOrEmpty>, <factor>, this.stackOf())
 [this|the] {background|bkgnd|bg}							=>	this.stackOf().background
 `);
 XTalk.ImportGrammar('stack',`
@@ -1425,6 +1613,18 @@ return (String(a).toLowerCase() > String(b).toLowerCase());
 XTalk.ImportGrammar('expression', `
 <expression> or <expression>								=>	boolean(<expression>) || boolean(<expression>)
 <expression> and <expression>								=>	boolean(<expression>) && boolean(<expression>)
+<factor> is {a|an} number									=>  !!((v)=>String(v) && !isNaN(v))(<factor>)
+| <factor> is not {a|an} number								=>  !((v)=>String(v) && !isNaN(v))(<factor>)
+| <factor> is {a|an} integer									=>  !!((v)=>String(v) && !isNaN(v) && Number.isInteger(Number(v)))(<factor>)
+| <factor> is not {a|an} integer								=>  !((v)=>String(v) && !isNaN(v) && Number.isInteger(Number(v)))(<factor>)
+| <factor> is {a|an} logical									=>  ['true','false'].includes(String(<factor>).toLowerCase())
+| <factor> is not {a|an} logical								=>  !['true','false'].includes(String(<factor>).toLowerCase())
+| <factor> is {a|an} point										=>  ((v)=>{ try { point(v); return true; } catch(e) { } return false; })(<factor>)
+| <factor> is not {a|an} point									=>  ((v)=>{ try { point(v); return false; } catch(e) { } return true; })(<factor>)
+| <factor> is {a|an} {rect|rectangle}							=>  ((v)=>{ try { rectangle(v); return true; } catch(e) { } return false; })(<factor>)
+| <factor> is not {a|an} {rect|rectangle}						=>  ((v)=>{ try { rectangle(v); return false; } catch(e) { } return true; })(<factor>)
+| <factor> is {a|an} date										=>  !isNaN(Date.parse(<factor>))
+| <factor> is not {a|an} date									=>  isNaN(Date.parse(<factor>))
 <expression> is within <expression>							=>	((p,r)=>(p[0]>=r[0] && p[0]<r[2] && p[1]>=r[1] && p[1]<r[3]))(point(<expression>),rectangle(<expression>))
 | <expression> is not within <expression>					=>	!((p,r)=>(p[0]>=r[0] && p[0]<r[2] && p[1]>=r[1] && p[1]<r[3]))(point(<expression>),rectangle(<expression>))
 | <expression> { ≠ | <> | is not [in]- } <expression>	   					 	=> !is_equal(<expression>,<expression>)
@@ -1433,9 +1633,10 @@ XTalk.ImportGrammar('expression', `
 | <expression> { is {greater|more} [than] or equal to | ≥| >= } <expression>	=> !is_less(<expression>,<expression>)
 | <expression> { is {smaller|less} than | < } <expression>						=> is_less(<expression>,<expression>)
 | <expression> { is {greater|more} than | > } <expression>						=> is_more(<expression>,<expression>)
-| <expression> contains <expression>						=>	String(<expression>).toLowerCase().includes(String(<expression>).toLowerCase())
-| <expression> is in <expression>							=>	String(<expression>).toLowerCase().includedBy(String(<expression>).toLowerCase())
-| <expression> is not in <expression>						=>	!String(<expression>).includedBy(<expression>)
+
+| <expression> contains <expression>						=>	!!((a,b)=>b.length && a.includes(b))(String(<expression>).toLowerCase(),String(<expression>).toLowerCase())
+| <expression> is in <expression>							=>	!!((b,a)=>b.length && a.includes(b))(String(<expression>).toLowerCase(),String(<expression>).toLowerCase())
+| <expression> is not in <expression>						=>	!((b,a)=>b.length && a.includes(b))(String(<expression>).toLowerCase(),String(<expression>).toLowerCase())
 <expression> & <expression>									=>	[<expression>, <expression>].join('')
 | <expression> && <expression>								=>	[<expression>, <expression>].join(' ')
 <expression> { plus | + } <expression>						=>	number(<expression>) + number(<expression>)
@@ -1445,21 +1646,9 @@ XTalk.ImportGrammar('expression', `
 | <expression> div <expression>								=>	Math.floor( number(<expression>) / number(<expression>) )
 | <expression> mod <expression>								=>	number(<expression>) % number(<expression>)
 <exponent>
-<value>
+<factor>
 `);
-XTalk.ImportGrammar('value',`
-<value> is {a|an} number									=>  !!((v)=>String(v) && !isNaN(v))(<value>)
-<value> is not {a|an} number								=>  !((v)=>String(v) && !isNaN(v))(<value>)
-<value> is {a|an} integer									=>  Number.isInteger(<value>)
-<value> is not {a|an} integer								=>  !Number.isInteger(<value>)
-<value> is {a|an} logical									=>  ['true','false'].includes(String(<value>).toLowerCase())
-<value> is not {a|an} logical								=>  !['true','false'].includes(String(<value>).toLowerCase())
-<value> is {a|an} point										=>  ((v)=>{ try { point(v); return true; } catch(e) { } return false; })(<value>)
-<value> is not {a|an} point									=>  ((v)=>{ try { point(v); return false; } catch(e) { } return true; })(<value>)
-<value> is {a|an} {rect|rectangle}							=>  ((v)=>{ try { rectangle(v); return true; } catch(e) { } return false; })(<value>)
-<value> is not {a|an} {rect|rectangle}						=>  ((v)=>{ try { rectangle(v); return false; } catch(e) { } return true; })(<value>)
-<value> is {a|an} date										=>  !isNaN(Date.parse(<value>))
-<value> is not {a|an} date									=>  isNaN(Date.parse(<value>))
+XTalk.ImportGrammar('factor',`
 [the] number of {cards|cds} {of|in} <background> 		 	=>	Array.from(this.stackOf().qsa('card-part')).filter((c)=>(c.bkgndID==<background>.id)).length
 [the] number of {cards|cds}	[{of|in} [this|the] stack]			=>	this.stackOf().qsa('card-part').length
 [the] number of marked {cards|cds} [{of|in} [this|the] stack]		=>	this.stackOf().qsa('card-part[marked]:not([marked="false" i])').length
@@ -1470,53 +1659,59 @@ XTalk.ImportGrammar('value',`
 [the] number of <cdOrBg> {fields|flds} 						=>	this.stackOf().<cdOrBg>.qsa('field-part').length
 [the] number of <bgOrCd> {parts} {of|in} <part> 			=>	this.stackOf().<bgOrCd>.qsa('button-part,field-part').length
 [the] number of <bgOrCd> {parts} 							=>	this.stackOf().<bgOrCd>.qsa('button-part,field-part').length
+[the] number of <chunkType> {of|in} <factor> 				=> XTalkChunk(['<chunkType>', 'number', null], <factor>, [])
 #
-there is {not a | no | a} stack <value> 					=>  true
+there is {not a | no | a} stack <factor> 					=>  true
 
-there is {a|an} <part>										=>  (yield*(function*(){ try{ console.log(<part>); return (<part> instanceof HTMLElement);} catch(e){if(e instanceof XTalk.NoSuch)return false; throw e;} }).call(this))
+there is {a|an} <part>										=>  (yield*(function*(){ try{ return (<part> instanceof HTMLElement);} catch(e){if(e instanceof XTalk.NoSuch)return false; throw e;} }).call(this))
 there is {no|not a|not an} <part>							=>  (yield*(function*(){ try{return !(<part> instanceof HTMLElement);} catch(e){if(e instanceof XTalk.NoSuch)return true; throw e;} }).call(this))
 #
 value(<expression>) | [the] value of <expression>
 =>  (yield*xtalk_value_coroutine(this, _, <expression>))
 
 param(<expression>)											=>  ((p)=>((p===undefined) ? '' : p))(arguments[number(<expression>)-1])
-[the] param of <value>										=>  ((p)=>((p===undefined) ? '' : p))(arguments[number(<value>)-1])
+[the] param of <factor>										=>  ((p)=>((p===undefined) ? '' : p))(arguments[number(<factor>)-1])
 paramCount() | [the] paramCount 	 						=>  arguments.length
 params() | [the] params 									=>  ""
-[the] {selectedButton|selectedBtn} of <bgOrCd> family <value>   => ((this.stackOf().<bgOrCd>.partOf('button-part[hilite="true" i][family="'+<value>+'" i]',1) || {}).longName || '')
-[the] <property> of <part>									=>	<part>.<property>
+[the] {selectedButton|selectedBtn} of <bgOrCd> family <factor>
+=> ((this.selectOf('button-part[hilite="true" i][family="'+<factor>+'" i]','number',1,this.stackOf().<bgOrCd>,true)||{}).longName||'')
+
+[the] {textFont|textSize|textStyle|textHeight} {of|in} <chunkList> <part>		=> ""
+
+# the x of y is tricky.
+[the] [<oneParamBuiltin>]- <property> of <part>					=>	<part>.<property>
+[the] [[<propertyBuiltin>]-]- <property> of <partOrEquiv>		=> <partOrEquiv>.<property>
+
 <partPossessive> <property>									=>	<partPossessive>.<property>
 the result													  =>	_.the_result
 the short target											=>  XTalkQueue.Active.Target.name
-the long target												=>  XTalkQueue.Active.Target.longName
-[the] {textFont|textSize|textStyle|textHeight} {of|in} [<chunkList>] <part>		=> "";
+the [abbr|abbrev|abbreviated|long] target						=>  XTalkQueue.Active.Target.longName
 target														=> XTalkQueue.Active.Target.contents
-<chunkList> <value> <possessiveChunkList>					=> XTalkChunk([<chunkList>], <value>, [<possessiveChunkList>])
-<chunkList> <value> 										=> XTalkChunk([<chunkList>], <value>, [])
-<value> <possessiveChunkList>								=> XTalkChunk([], <value>, [<possessiveChunkList>])
-[the] number of <chunkType> {of|in} <value> 				=> XTalkChunk(['<chunkType>', 'number', null], <value>, [])
+<chunkList> <factor> <possessiveChunkList>					=> XTalkChunk([<chunkList>], <factor>, [<possessiveChunkList>])
+<chunkList> <factor> 										=> XTalkChunk([<chunkList>], <factor>, [])
+<factor> <possessiveChunkList>								=> XTalkChunk([], <factor>, [<possessiveChunkList>])
 
-the <message> {of|in} <value>								=> (yield*this.functions.<message>(<value>))
-<oneParamBuiltin> {of|in} <value>							=> (yield*this.functions.<oneParamBuiltin>(<value>))
-not <value>													=> !boolean(<value>)
-<buttonOrField>												=> <buttonOrField>.contents
+the <message> {of|in} <factor>								=> (yield*this.functions.<message>(<factor>))
+<oneParamBuiltin> {of|in} <factor>							=> (yield*this.functions.<oneParamBuiltin>(<factor>))
+not <factor>													=> !boolean(<factor>)
+<partWithContents>											=> <partWithContents>.contents
 me															=> (['BUTTON-PART','FIELD-PART'].includes(this.me.nodeName) ? this.me.contents : this.me.longName)
 <part>														=> <part>.longName
 #
-the [short|long|abbr|abbrev|abbreviated] date				=> (yield*sim.functions.date())
-the [short|long|abbr|abbrev|abbreviated] time				=> (yield*sim.functions.time())
-the long version 											=> (yield*(sim.functions.longVersion||XTalk.cu('<message>'))())
+the [short|abbr|abbrev|abbreviated|long] date				=> (yield*sim.functions.date())
+the [short|abbr|abbrev|abbreviated|long] time				=> (yield*sim.functions.time())
+the long version 											=> (yield*(sim.functions.longVersion||XTalk.cu('long version'))())
 [the] <message>(<expressionList>)							=>  (yield*(this.functions.<message>||XTalk.cu('<message>'))(<expressionList>))
 the <message>												=>	(yield*(sim.functions.<message>||XTalk.cu('<message>'))())
 <variable>													=>	_.<variable>
-<hyphen><value>												=>	-number(<value>)
+<hyphen><factor>											=>	-number(<factor>)
 (<expression>)												=>	(<expression>)
 <number> | <string> | <hcjunk>
 `);
 XTalk.ImportGrammar('',`
-<exponent> = <value>^<exponent>								=>	Math.pow(<value>, <exponent>)
-<exponent> = <value>^<value>								=>	Math.pow(<value>, <value>)
-<scriptLine> = { <command> | <statement> }
+<exponent> = <factor>^<exponent>								=>	Math.pow(<factor>, <exponent>)
+<exponent> = <factor>^<factor>								=>	Math.pow(<factor>, <factor>)
+<scriptLine> = { <command> | <statement> | <messageCall> }
 <expressionList> = [ <exprOrEmpty> [, <exprOrEmpty> ]* ]
 <exprOrEmpty> = <expression>
 <exprOrEmpty> = [] => ""
@@ -1524,10 +1719,12 @@ XTalk.ImportGrammar('',`
 <message> | <variable> | <handlerName> = <identifier>
 
 <property> = short name => name
-<property> = [abbreviated|abbrev|long] name => longName
+<property> = [abbr|abbrev|abbreviated|long] name => longName
 
-<property> = [short|abbreviated|abbrev] id => id
+<property> = [short|abbr|abbrev|abbreviated] id => id
 <property> = long id => longID
+
+<property> = [short|abbr|abbrev|abbreviated|long] number => number
 
 <property> = style => type
 <property> = <identifier>
@@ -1539,8 +1736,8 @@ XTalk.ImportGrammar('',`
 <idOrEmpty> = [] => ''
 <globalList> = <globalDec> [, <globalDec> ]*
 <globalDec> = <variable>									=> (_.$global.<variable>=true)
-<identOrValueOf> = <identifier> {of|in}						=> _.<identifier>
-<identOrValueOf> = <value> {of|in}							=> <value>
+<identOrFactorOf> = [<oneParamBuiltin>]- <identifier> {of|in}						=> _.<identifier>
+<identOrFactorOf> = <factor> {of|in}							=> <factor>
 <partPossessive> = <part>'s 								=> <part>
 <partPossessive> = my 										=> this.me
 <expressionWithCommas> = <expressionWithCommasInner>		=> [<expressionWithCommasInner>].join(',')
@@ -1548,10 +1745,10 @@ XTalk.ImportGrammar('',`
 <expressionWithCommasInner> = <expression> {, <expression>}*
 <expressionEndOfScriptLine> = <expression> <endOfScriptLine>
 
-<valuesWithSpaces> = <valuesWithSpacesInner>		=> [<valuesWithSpacesInner>].join(' ')
-<valuesWithSpacesInner> = <valueOrText> [ <impliedSpace> <valueOrText> ]*
-<valueOrText> = <value>
-<valueOrText> = <extratext> => \`<extratext>\`
+<factorsWithSpaces> = <factorsWithSpacesInner>		=> [<factorsWithSpacesInner>].join(' ')
+<factorsWithSpacesInner> = <factorOrText> [ <impliedSpace> <factorOrText> ]*
+<factorOrText> = <factor>
+<factorOrText> = <extratext> => \`<extratext>\`
 <impliedSpace> = [] => ,
 
 <addSubtract> = add => +
@@ -1563,30 +1760,32 @@ XTalk.ImportGrammar('',`
 <cardOrdinal> = next 				=> 'next'
 <cardOrdinal> = <ordinal>
 
-<oneParamBuiltin> = { random | round | sqrt | trunc | sin | cos | tan | atan | exp | exp1 | exp2 | ln | ln1 | log2 | abs | charToNum | numToChar | length }
+<oneParamBuiltin> = { random | round | sqrt | trunc | sin | cos | tan | atan | exp | exp1 | exp2 | ln | ln1 | log2 | abs | charToNum | numToChar | length | param }
+<propertyBuiltin> = [short|long|abbr|abbrev|abbreviated] { autoHilite | autoSelect | autoTab | botRight | bottom | bottomRight | cantAbort | cantDelete | cantModify | cantPeek | dontSearch | dontWrap | editBkgnd | enabled | family | fixedLineHeight | height | highlight | highlite | hilight | hilite | icon | id | left | loc | location | lockText | marked | name | number | owner | partNumber | rect | rectangle | right | script | scroll | sharedHilite | sharedText | showLines | showName | showPict | size | style | textAlign | textFont | textHeight | textSize | textStyle | top | topLeft | userModify | version | visible | wideMargins | width }
 
 `, { show_to_user: true });
 
-XTalk.Rules['valueOrText'][0].options = {
+XTalk.Rules['factorOrText'][0].options = {
 postflight(text,index,Packrat)
 {
 // if there's a nonspace right after this, don't accept
 var nonspaceafter = !!/[\S]/.test(text[index] || '');
-//console.log('after valueOrText[0]: ' + text[index], nonspaceafter);
+//console.log('after factorOrText[0]: ' + text[index], nonspaceafter);
 //if (nonspaceafter) debugger;
 return !nonspaceafter;
 }
 }
 
-XTalk.Rules['valueOrText'][1].options = {
+XTalk.Rules['factorOrText'][1].options = {
 postflight(text,index,Packrat)
 {
-//console.log('after valueOrText[1]:' + text.substr(index));
+//console.log('after factorOrText[1]:' + text.substr(index));
 return true;
 }
 }
 
-XTalk.Support('identifier', /^[A-Z_][A-Z_\d]*/i, '', {
+
+XTalk.Support('identifier', /* /^[A-Z_][A-Z_\d]*i/ */ /^[a-zA-ZÀ-ž_][a-zA-ZÀ-ž_0-9]*/i, '', {
 preflight(text,index,Packrat) {
 if (/(then|the|else)([^A-Z\d]|$)/iy.test(text.substr(index,5))) return false; 	/* "the" is not an identifer */
 return true;
@@ -1608,7 +1807,14 @@ XTalk.Support('number', /[.]?[\d]+([\.][\d]+)?/, '', {
 postproduce(out)
 { /*console.log(out);*/ while ((/^[0][0-9]/).test(out[0])) out[0] = out[0].substr(1); return true; }
 });
-XTalk.Support('string', /"[^"]*"/);
+XTalk.Support('string', /"[^"]*"/, '', {
+postproduce(out)
+{ out[0] = out[0].replaceAll("\\", "\\\\"); return true; }
+});
+XTalk.Support('string', /"[^"]+$/, '', {
+postproduce(out) 	// string with no end quote is allowed in HC
+{ out[0] = out[0].replaceAll("\\", "\\\\") + '"'; return true; }
+});
 XTalk.Support('string', /\'[^\']*\'/);
 XTalk.Support('linefeed', /[^\S\n]*(--[^\n]*)?([\n]|$)/, ' ');
 XTalk.Support('wholeline', /[^\n]*/);
@@ -1624,13 +1830,13 @@ XTalk.Support('hcjunkKatakana', /[\p{Script_Extensions=Katakana}]/u);
 XTalk.Support('handler-line', "[ <scriptLine> ] <linefeed>");
 
 /*
-1. having <value> = <value> <possessiveChunkList> works. But
-having <value> = <chunkedValue>
-<chunkedValue> = <value> <possessiveChunkList> doesn't. Gotta trace the LR
+1. having <factor> = <factor> <possessiveChunkList> works. But
+having <factor> = <chunkedFactor>
+<chunkedFactor> = <factor> <possessiveChunkList> doesn't. Gotta trace the LR
 √	2. can't have a list of possessivechunks left to right! Have to do them in reverse order, so maybe as recursive rule.
 √	3. Reversing things in the parser makes them evaluate in an unusual order. Maybe it doesn't matter.
 √	4. What about "first char of value's second word"? Can we roll it all together?
-5. [the] <message> of <value>'s chunk   is going to be weird.
+5. [the] <message> of <factor>'s chunk   is going to be weird.
 6. set the third word of cd btn 22 of this card's name to
 looks like: the third word of cd btn 22 of (this card's name)
 parses as: the third word of (cd btn 22 of this card)'s name
@@ -1647,23 +1853,28 @@ XTalk.ImportGrammar('',`
 <chunkOf> = <chunkType> <identOrExprTo> <identOrExprOf> 		=> '<chunkType>', number(<identOrExprTo>), number(<identOrExprOf>),
 <chunkOf> = <chunkType> <identOrExprOf> 						=> '<chunkType>', number(<identOrExprOf>), null,
 <possessiveChunk> = 's <ordinal> <chunkType>					=> '<chunkType>', <ordinal>, null,
-<possessiveChunk> = 's <chunkType> <identOrExprTo> <identOrValue>	=> '<chunkType>', number(<identOrExprTo>), number(<identOrValue>),
-<possessiveChunk> = 's <chunkType> <identOrValue>				=> '<chunkType>', number(<identOrValue>), null,
-<identOrExprOf> = <identifier> {of|in}							=> _.<identifier>
+<possessiveChunk> = 's <chunkType> <identOrExprTo> <identOrFactor>	=> '<chunkType>', number(<identOrExprTo>), number(<identOrFactor>),
+<possessiveChunk> = 's <chunkType> <identOrFactor>				=> '<chunkType>', number(<identOrFactor>), null,
+<identOrExprOf> = [<oneParamBuiltin>]- <identifier> {of|in}		=> _.<identifier>
 <identOrExprOf> = <expression> {of|in}							=> <expression>
 <identOrExprTo> = <identifier> to								=> _.<identifier>
 <identOrExprTo> = <expression> to								=> <expression>
-<identOrValue> = <identifier>									=> _.<identifier>
-<identOrValue> = <value>										=> <value>
+<identOrFactor> = <identifier>									=> _.<identifier>
+<identOrFactor> = <factor>										=> <factor>
 <ordinal> = [the] first											=> 1
 <ordinal> = [the] second										=> 2
 <ordinal> = [the] third											=> 3
 <ordinal> = [the] fourth										=> 4
 <ordinal> = [the] fifth											=> 5
+<ordinal> = [the] sixth											=> 6
+<ordinal> = [the] seventh										=> 7
+<ordinal> = [the] eighth										=> 8
+<ordinal> = [the] ninth											=> 9
+<ordinal> = [the] tenth											=> 10
 <ordinal> = [the] {middle|mid}									=> 'middle'
 <ordinal> = [the] last											=> 'last'
 <ordinal> = any													=> 'any'
-#<chunkCount> = [the] number of <chunkType> {of|in} <value> 	=> XTalkChunk(['<chunkType>', 'number', null], <value>, [])
+#<chunkCount> = [the] number of <chunkType> {of|in} <factor> 	=> XTalkChunk(['<chunkType>', 'number', null], <factor>, [])
 `, { show_to_user: true });
 
 // first chunk of second chunk of value's fourth chunk's third chunk
@@ -1703,9 +1914,11 @@ yield [chunkstart, i];
 while (i < end);
 }
 
+var type;
 for (var c = ofchunks.length - 3; c >= 0; c -= 3)
 {
-var type = ofchunks[c][0].toLowerCase(), from = ofchunks[c+1], to = ofchunks[c+2];
+type = ofchunks[c][0].toLowerCase();
+var from = ofchunks[c+1], to = ofchunks[c+2];
 
 if (type == 'c')
 {
@@ -1714,7 +1927,7 @@ delimiter = "";
 if (from==='last')
 start = Math.max(start, end - 1);
 else if (from==='middle') {
-start += Math.floor((end-start)/2);
+start += Math.ceil((end-start)/2);
 end = Math.min(end, start+1);
 }
 else if (from=='any') {
@@ -1738,12 +1951,16 @@ var iter = delimiter ? lineitemiterator(delimiter) : (type == 'w') ? ((delimiter
 var next, chunks = [];
 while (!(next=iter.next()).done)
 chunks.push(next.value);
+
+// do not include any final spaces in word chunk
+if (type == 'w' && chunks[chunks.length-1][0]===chunks[chunks.length-1][1] && chunks.length > 1)
+chunks.pop();
 //console.log(chunks);
 var startvalue, endvalue;
 if (from==='last')
 startvalue = endvalue = chunks[chunks.length-1];
-else if (from==='middle')
-startvalue = endvalue = chunks[Math.round(chunks.length/2)];
+else if (from==='middle')	// middle of 5 is 3 = [2], middle of 6 is 4 = [3]
+startvalue = endvalue = chunks[Math.floor(chunks.length/2)];
 else if (from==='any')
 startvalue = endvalue = chunks[Math.floor(Math.random()*chunks.length)];
 else if (from=='number') {
@@ -1767,14 +1984,29 @@ start = startvalue[0]; end = endvalue[1];
 // now we have the range
 //console.log('range',start,end,delimiter_addition);
 
-if (return_range) {
-if (return_range == 'includeTrailing' && delimiter) {
-// delete will also kill the following delimiter
+if (return_range)
+{
+if (return_range == 'includeTrailing')
+{
+if (type == 'w')
+{
+delimiter = new RegExp(/[ ]*/, 'y');
+delimiter.lastIndex = end;
+var match = delimiter.exec(value);
+end += match[0].length;
+// also include leading spaces IF its the last word...hang on...
+while (start > 0 && value[start-1]===' ')	// this should stop in the context of the other chunk....
+start--;
+}
+else if (delimiter)
+{
+// delete will also kill the following delimiter, and in the case of word, it should trim the front
 delimiter = new RegExp(delimiter, 'y');
 delimiter.lastIndex = end;
 var match = delimiter.exec(value);
 if (match)
 end += match[0].length;
+}
 }
 
 return [start,end,delimiter_addition];		// HC added commas or returns to help your put intos, and delete will also kill the following delimiter
@@ -1855,7 +2087,6 @@ on exitField
 end exitField
 
 -- these messages are sent when the keyboard is used in the stack.
--- the simulator script catches some and sends other messages you can catch.
 
 on keyDown which
 -- sent when a keyboard key is pressed
@@ -1868,6 +2099,12 @@ else if ascii is 31 and not (targetIsField and the textArrows) then send "arrowK
 else if ascii is 9 then send "tabKey" to the target
 else if (ascii is 10 or ascii is 13) and targetIsField then send "returnInField" to the target
 else if (ascii is 10 or ascii is 13) and not targetIsField then send "returnKey" to the target
+else if the blindTyping then
+if (!document.activeElement || document.activeElement.matches('div,field-part,card-part') || !window.messagebox_input) return;
+put which
+getSelection().selectAllChildren(window.messagebox_input);
+getSelection().collapseToEnd();
+end if
 end keyDown
 
 on arrowKey which
@@ -1897,11 +2134,11 @@ on idle
 -- this message will be sent repeatedly to the current card
 end idle
 
--- and here are some routines you can use
+-- and here are some handlers you can use by typing their name in the message box.
 
 on help
 go home
-go to card "What was HyperCard?"
+sim.stack.card = this.selectOf('card-part', 'name', "What was HyperCard?", sim.stack);
 end help
 
 on sampleMessage
@@ -1915,7 +2152,7 @@ put "I'm writing a handler!" into greeting
 answer greeting
 end myHandler
 
-on Fizzbuzz
+on FizzBuzz
 -- a famous homework problem
 get empty
 repeat with n=1 to 100
@@ -1929,7 +2166,7 @@ if n mod 3 is 0 then put Fizz after it
 if n mod 5 is 0 then put Buzz after it
 end repeat
 put it
-end Fizzbuzz
+end fizzbuzz
 
 -- you can also write functions like the square of five or the sqrt(9+9)
 
@@ -1941,8 +2178,7 @@ function sqrt n
 return the abs of n ^0.5
 end sqrt
 
--- You can mix in lines of JavaScript too
--- Some of the simulator is scripted here
+-- You can mix in lines of JavaScript.
 
 function random n
 return Math.floor(Math.random()*number(n)) + 1;
@@ -2088,16 +2324,22 @@ end clickH
 function clickV
 return item 2 of the clickLoc
 end clickV
+function clickText
+-- this should return the clicked word or group
+return empty
+end clickText
+function clickLine
+return sim.clickLine || '';
+end clickLine
 function mouse
 return sim.mouse || 'up';
 end mouse
 function mouseClick
--- this is apparently more of a once-per-handler 'true' than a button==down
-return sim.mouse=='down';
+if (!this.stackOf().mouseClick) return false;
+this.stackOf().mouseClick = false;
+wait until the mouse is up
+return true
 end mouseClick
-function clickLine
-return sim.clickLine || '';
-end clickLine
 
 function screenRect
 return String([0,0,stackcontainer.offsetWidth,stackcontainer.offsetHeight]);
@@ -2114,33 +2356,14 @@ end optionKey
 function sound
 return sim.sound || 'done';
 end sound
-on doMenu what
-if what contains "New Stack" then
-newstack.click();
-else if what contains "New Card" then
-sim.stack.newCard();
-else if what contains "Stack Info" then
-launch_info_dialog(sim.stack);
-else if what contains "Import Stack" then
-importstack.click();
-else if what contains "Message" then
-document.getElementById('messagebox-visible').click();
-else if what contains "first" then go first
-else if what contains "prev" then go prev
-else if what contains "next" then go next
-else if what contains "last" then go last
-else if what contains "home" then go home
-else if what contains "back" then go back
-else if what contains "help" then help
-else log "doMenu" && what
-end doMenu
 function offset needle, haystack
-return String(haystack).indexOf(needle) + 1;
+return String(haystack).toLowerCase().indexOf(String(needle).toLowerCase()) + 1;
 end offset
 
 on setPattern what
 if what is an integer then
 set_gray_pattern('ui-patterns/PAT128_'+(sim.pattern=(what-1))+'.png');
+if (window.patternz) { window.patternz.style.setProperty('--pattern-x', Math.floor((what-1)/10)); window.patternz.style.setProperty('--pattern-y', (what-1)%10); }
 end if
 end setPattern
 function pattern
@@ -2153,7 +2376,6 @@ end setLineSize
 function lineSize
 return sim.lineSize || 1;
 end lineSize
-
 
 on setBlindTyping
 end setBlindTyping
@@ -2206,6 +2428,41 @@ end setDragSpeed
 function dragSpeed
 return 0
 end dragSpeed
+on setFilled
+end setFilled
+function filled
+end filled
+
+on setTextFont what
+painttext_proxy.textFont = what;
+end setTextFont
+function textFont
+return painttext_proxy.textFont;
+end textFont
+on setTextSize what
+painttext_proxy.textSize = what;
+end setTextSize
+function textSize
+return painttext_proxy.textSize;
+end textSize
+on setTextHeight what
+painttext_proxy.textHeight = what;
+end setTextHeight
+function textHeight
+return painttext_proxy.textHeight;
+end textHeight
+on setTextAlign what
+painttext_proxy.textAlign = what;
+end setTextAlign
+function textAlign
+return painttext_proxy.textAlign;
+end textAlign
+on setTextStyle what
+painttext_proxy.textStyle = what;
+end setTextStyle
+function textStyle
+return painttext_proxy.textStyle;
+end textStyle
 
 on setLockMessages value
 sim.lockMessages = boolean(value);
@@ -2232,6 +2489,7 @@ end windows
 function stacks
 end stacks
 function menus
+return Array.from(this.stackOf().parentNode.menubar.qsa('title-bar-menu')).map((tbm)=>tbm.name).join('\\n');
 end menus
 function voices
 end voices
@@ -2244,7 +2502,6 @@ end diskSpace
 function heapSpace
 return 2^20
 end heapSpace
-
 function version
 get the shortVersion of the stack
 if it is a number then return it
@@ -2257,12 +2514,39 @@ function systemVersion
 return 6.08
 end systemVersion
 
+on doMenu what
+if what contains "New Stack" then
+newstack.click();
+else if what contains "New Card" then
+sim.stack.newCard();
+else if what contains "New Background" then
+sim.stack.newCard(true);
+else if what contains "New Button" then
+body.qs('#toolbarvert button-part[name="New Button" i]').click();
+else if what contains "New Field" then
+body.qs('#toolbarvert button-part[name="New Field" i]').click();
+else if what contains "Stack Info" then
+launch_info_dialog(sim.stack);
+else if what contains "Import Stack" then
+importstack.click();
+else if what contains "Message" then
+if (document.getElementById('messagebox-visible')) document.getElementById('messagebox-visible').click();
+else if what contains "Help" then help
+else if what contains "first" then go first
+else if what contains "prev" then go prev
+else if what contains "next" then go next
+else if what contains "last" then go last
+else if what contains "home" then go home
+else if what contains "back" then go back
+else
+log "doMenu" && what
+end if
+end doMenu
+
 on select selPart
-if there is not a part selPart then return
-console.log(selPart);
-if (sim.stackOf(selPart)===sim.stack)
-sim.selectOf('#toolbar button-part', '', selPart.matches('field-part') ? 'Field' : 'Button', body).click();
-sim.stackOf(selPart).selectedPart = selPart;
+if (selPart instanceof HTMLElement) { if (sim.stackOf(selPart)===sim.stack) sim.selectOf('#toolbar button-part', '', selPart.matches('field-part') ? 'Field' : 'Button', body).click(); sim.stackOf(selPart).selectedPart = selPart; return; }
+if (!String(selPart)) { this.stackOf().focus(); return; }
+if word 1 of selPart is "line" and word 2 of selPart is an integer and word 3 of selPart is "of" then do "select" && selPart
 end select
 
 on answer _parent, promptText, firstButton, secondButton, thirdButton
@@ -2279,14 +2563,16 @@ var xtqa = XTalkQueue.Active;
 yield (launch_ask_dialog((result)=>{ _parent.the_result = askdialog.button_result; _parent.it = askdialog.text_result; xtqa.resume(); }, promptText, initialText), {timeout: 2**32});
 end ask
 
-on choose which
-if which is a number then put item which of "browse,button,field,select,lasso,pencil,brush,eraser,line,spray,rectangle,round rect,bucket,oval,curve,text,regular polygon,polygon" into which
-if last word of which is "tool" then delete last word of which
-if which is "rect" then put "rectangle" into which
-if which is "round rectangle" then put "round rect" into which
-if which is "poly" then put "polygon" into which
-if which is "regular poly" then put "regular polygon" into which
-body.qs('#toolbar button-part[name=\"' + _.which.trim() + '\" i]').click();
+on choose it
+
+if it is a number then get item it of "browse,button,field,select,lasso,pencil,brush,eraser,line,spray,rectangle,round rect,bucket,oval,curve,text,regular polygon,polygon"
+if last word of it is "tool" then delete last word of it
+if it is "rect" then get "rectangle"
+if it is "round rectangle" then get "round rect"
+if it is "poly" then get "polygon"
+if it is "spray can" then get "spray"
+if it is "regular poly" or it is "reg poly" or it is "reg polygon" then get "regular polygon"
+body.qs('#toolbar button-part[name=\"' + _.it.trim() + '\" i]').click();
 end choose
 
 on beep count
@@ -2299,7 +2585,7 @@ play beep tempo 300 it
 end beep
 
 on play first, notes
-if (first=='stop') restart_audio(); else perform_classic_play_command(first, notes);
+if (first=='stop') kill_audio(); else perform_classic_play_command(first, notes);
 end play
 
 on speak text, voice
@@ -2310,6 +2596,14 @@ return window.speechSynthesis.speaking ? 'speaking' : 'done';
 end speech
 
 on goToStack target
+push_recent_card(sim.card);
+if target is "Home" then
+go home
+exit goToStack
+end if
+target = String(target).replaceAll(':','/').replaceAll(/[^\\w\\/]/g,'-');
+var levels = 0; while (target[levels]=='/') levels++;
+if (levels) { var md = this.stackOf().parentNode; target = (md.dataset.user?md.dataset.user+'/':'')+((md.dataset.path||'').split('/').slice(0,-levels).join('/'))+target.substr(levels-1); }
 console.log('going to stack ' + tickedString(target));
 var userpath = target.split('/');
 if (userpath.length > 1) { download_user_stack(userpath.shift(),userpath.join('/')); }
@@ -2323,7 +2617,6 @@ repeat howMany
 wait 5 ticks
 go next card
 end repeat
-
 set the lockMessages to false
 end showCards
 
@@ -2332,6 +2625,31 @@ var a = document.createElement('a');
 a.href = "mailto:dan@hypervariety.com?body=" + encodeURI(bugReport);
 a.click();
 end sendToMe
+
+function rj_list_icons
+return Array.from(JSON.parse(this.stackOf().importedICONResources||'[]')).map((i)=>(i.ID + ' ' + i.name)).join('\\n');
+end rj_list_icons
+
+function rj_retrieve_icon id
+var icon = JSON.parse(sim.stack.importedICONResources||'[]').find((i)=>i.ID==id);
+if (!icon) return '';
+return atob(icon.data).split('').map((p)=>[(p=p.charCodeAt(0))&128,p&64,p&32,p&16,p&8,p&4,p&2,p&1]).flat().map((b)=>b?1:0).join('');
+end rj_retrieve_icon
+
+on rj_store_icon id, withName, bits
+if the length of bits is not 32^2 then return "Icons are 1024 chars long, 0 for white, 1 for black"
+var icons = JSON.parse(sim.stack.importedICONResources||'[]'), icon = icons.find((i)=>i.ID==id);
+if (!icon) icons.push(icon={ ID:id });
+icon.name = withName;
+icon.data = "";
+for (var b=0; b < bits.length; b += 8) icon.data += String.fromCharCode(((bits[b+0]==0)?0:128)+((bits[b+1]==0)?0:64)+((bits[b+2]==0)?0:32)+((bits[b+3]==0)?0:16)+((bits[b+4]==0)?0:8)+((bits[b+5]==0)?0:4)+((bits[b+6]==0)?0:2)+((bits[b+7]==0)?0:1));
+icon.data = btoa(icon.data);
+this.stackOf().importedICONResources = JSON.stringify(icons);
+delete this.stackOf().importedICONImages;
+end rj_store_icon
+
+
+
 
 `;
 
@@ -2481,7 +2799,7 @@ if (!this[DynamicHelperSymbol]) { var trigger = this['']; }
 if (typeof this[DynamicHelperSymbol].disconnected === 'function') (this[DynamicHelperSymbol].disconnected)();
 }
 attributeChangedCallback(prop, oldValue, newValue) {
-//console.log('ACC',[prop,oldValue,newValue]);
+//console.log('attributeChangedCallback',[prop,oldValue,newValue]);
 if (!this[DynamicHelperSymbol]) { var trigger = this['']; }
 if (!this[DynamicHelperSymbol]) return;
 var defaultProp = defaults[prop.toLowerCase()];
@@ -2489,8 +2807,11 @@ if (defaultProp) {
 var desc = Object.getOwnPropertyDescriptor(this[DynamicHelperSymbol],defaultProp.attribute);
 if (defaultProp.symbol in this) {
 //console.log('ACC override',{oldValue,newValue,recent:this[defaultProp.symbol]});
-newValue = this[defaultProp.symbol];
+if (newValue===null)
+delete this[defaultProp.symbol];
+else newValue = this[defaultProp.symbol];
 }
+// if an attribute has a non-empty default value, does setting it to empty mean the default? No! removing the attribute means the default.
 if (desc && desc.set) (this[DynamicHelperSymbol])[defaultProp.attribute] = (newValue!==null) ? newValue : defaultProp.value;
 }
 }
@@ -2537,7 +2858,7 @@ it = it.map((e)=>(e.assignedNodes && e.assignedNodes()[0]) || e);
 it = it.map((e)=>{
 if (e.nodeName=='BR') return '\n';
 if (e.nodeValue!==null) return e.nodeValue.trim() || ' ';
-var tc = e.textContent;
+var tc = e.textContent || e.innerText;
 return tc + ((tc.substr(-1)=='\n') ? '' : '\n');
 });
 it = it.join('');
@@ -2562,8 +2883,9 @@ observer.observe(element, { childList: true, attributes: true, subtree: true });
 this.div_forms_observers.set(element,observer);
 div_form_observer([]);
 
-element.FixCENow = ()=> {	// usually call this first thing in oninput because the mutation observer hasn't yet run
+element.FixCENow = (debug)=> {	// usually call this first thing in oninput because the mutation observer hasn't yet run
 observer.takeRecords();
+if (debug) debugger;
 div_form_observer([]);
 };
 
@@ -2591,8 +2913,16 @@ observer.awaiting_DOMContentLoaded = true;
 }
 else
 {
-var sel = getSelection();
+var sel, shadowRange;
+if (document.activeElement && document.activeElement.shadowRoot && (sel=document.activeElement.shadowRoot.getSelection()) && sel.rangeCount && (shadowRange=sel.getRangeAt(0)))
+{
+sel = { anchorNode: shadowRange.startContainer, anchorOffset: shadowRange.startOffset, focusNode: shadowRange.endContainer, focusOffset: shadowRange.endOffset };
+}
+else
+{
+sel = getSelection();	// this isn't working for shadow roots
 sel = { anchorNode: sel.anchorNode, anchorOffset: sel.anchorOffset, focusNode: sel.focusNode, focusOffset: sel.focusOffset };
+}
 
 if (sel.anchorNode instanceof HTMLElement)
 { sel.anchorNode = sel.anchorNode.childNodes[sel.anchorOffset]; sel.anchorOffset = 0; }
@@ -2626,6 +2956,7 @@ while (examine.lastChild instanceof Text && examine.lastChild.nodeValue.trim().l
 examine.removeChild(examine.lastChild);
 
 // dump everything after the first BR
+examine.removeAttribute('style');
 var firstBR = examine.firstChild;
 while (firstBR && !(firstBR instanceof HTMLBRElement)) {
 if (firstBR.nodeType === 1 && element.classList.contains('script-indent')) {
@@ -2657,7 +2988,17 @@ examine.appendChild(document.createElement('br'));
 while (examine=examine.nextSibling);
 
 if (sel && element.contains(sel.anchorNode))
-getSelection().setBaseAndExtent(sel.anchorNode,sel.anchorOffset,sel.focusNode, (sel.focusOffset==-1) ? sel.focusNode.childNodes.length : sel.focusOffset);
+{
+if (!shadowRange || ShadowRoot.prototype.getSelection)
+getSelection().setBaseAndExtent(sel.anchorNode, sel.anchorOffset, sel.focusNode,
+(sel.focusOffset==-1) ? sel.focusNode.childNodes.length : sel.focusOffset);
+else {
+// tricky, but i guess it can be done, must find current sel and adjust until we're there
+//console.log('emitting contains selanchornode for shadow');
+
+//getSelection().modify('move','forward','character');
+}
+}
 }
 }
 },
@@ -2857,13 +3198,111 @@ return event.preventDefault();
 }
 });
 
+// https://github.com/GoogleChromeLabs/shadow-selection-polyfill/blob/master/demo.html
+// POLYFILL
+//https://jsfiddle.net/dbalcomb/oLnkyv78/
+const SUPPORTS_SHADOW_SELECTION = typeof window.ShadowRoot.prototype.getSelection === 'function';
+const SUPPORTS_BEFORE_INPUT = typeof window.InputEvent.prototype.getTargetRanges === 'function';
+const IS_FIREFOX = window.navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+
+class ShadowSelection {
+constructor() {
+this._ranges = [];
+}
+
+getRangeAt(index) {
+return this._ranges[index];
+}
+
+addRange(range) {
+this._ranges.push(range);
+}
+
+removeAllRanges() {
+this._ranges = [];
+}
+
+// todo: implement remaining `Selection` methods and properties.
+}
+
+function getActiveElement() {
+let active = document.activeElement;
+
+while (true) {
+if (active && active.shadowRoot && active.shadowRoot.activeElement) {
+active = active.shadowRoot.activeElement;
+} else {
+break;
+}
+}
+
+return active;
+}
+
+if (IS_FIREFOX && !SUPPORTS_SHADOW_SELECTION) {
+window.ShadowRoot.prototype.getSelection = function() {
+return document.getSelection();
+}
+}
+
+if (!IS_FIREFOX && !SUPPORTS_SHADOW_SELECTION && SUPPORTS_BEFORE_INPUT) {
+let processing = false;
+let selection = new ShadowSelection();
+
+window.ShadowRoot.prototype.getSelection = function() {
+return selection;
+}
+
+window.addEventListener('selectionchange', () => {
+if (!processing) {
+processing = true;
+
+const active = getActiveElement();
+
+if (active && (active.getAttribute('contenteditable') === 'true')) {
+document.execCommand('indent');
+} else {
+selection.removeAllRanges();
+}
+
+processing = false;
+}
+}, true);
+
+window.addEventListener('beforeinput', (event) => {
+if (processing) {
+const ranges = event.getTargetRanges();
+const range = ranges[0];
+
+const newRange = new Range();
+
+newRange.setStart(range.startContainer, range.startOffset);
+newRange.setEnd(range.endContainer, range.endOffset);
+
+selection.removeAllRanges();
+selection.addRange(newRange);
+
+event.preventDefault();
+event.stopImmediatePropagation();
+}
+}, true);
+
+window.addEventListener('selectstart', (event) => {
+selection.removeAllRanges();
+}, true);
+}
 "use strict";
 
 if (!Object.getOwnPropertyDescriptor(window,'body'))
 Object.defineProperty(window, 'body', { get() { return document.body; } });
 
-HTMLElement.prototype.qs = HTMLDocument.prototype.qs = ShadowRoot.prototype.qs = DocumentFragment.prototype.qs = function(selector) { return this.querySelector(...arguments); }
-HTMLElement.prototype.qsa = HTMLDocument.prototype.qsa = ShadowRoot.prototype.qsa = DocumentFragment.prototype.qsa = function(selector) { return this.querySelectorAll(...arguments); }
+[HTMLElement,HTMLDocument,ShadowRoot,DocumentFragment].forEach((p)=>{
+p.prototype.qs = p.prototype.querySelector;
+p.prototype.qsa = p.prototype.querySelectorAll;
+});
+
+/*HTMLElement.prototype.qs = HTMLDocument.prototype.qs = ShadowRoot.prototype.qs = DocumentFragment.prototype.qs = function(selector) { return this.querySelector(...arguments); }
+HTMLElement.prototype.qsa = HTMLDocument.prototype.qsa = ShadowRoot.prototype.qsa = DocumentFragment.prototype.qsa = function(selector) { return this.querySelectorAll(...arguments); }*/
 
 String.prototype.includedBy = function(s){ return String(s).includes(this); }
 
@@ -2961,10 +3400,40 @@ return levelTabs + top + ((level<noWhitespaceLevel)?"\n":"") + middle.map((l)=>l
 return levelTabs + top + middle.join('') + bottom;
 }
 
-var audio_context = new (window.AudioContext || window.webkitAudioContext || function(){})({ latencyHint: 'interactive' });
+var audio_context, built_in_sounds;
+function check_audio()
+{
+if (audio_context)
+return;
+audio_context = new (window.AudioContext || window.webkitAudioContext || function(){})({ latencyHint: 'interactive' });
+built_in_sounds = {
+beep: loadBase64Sound("data:audio/wav;base64,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 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////VEFHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAU291bmRib3kuZGUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMjAwNGh0dHA6Ly93d3cuc291bmRib3kuZGUAAAAAAAAAACU="),
+harpsichord: loadBase64Sound("data:audio/wav;base64,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tr3CvbWxsbGrqKain5iLio6QjYiBe29lWlNPT0lDPj4/QUNGTVNcXFxfZ2pwcXmBioqOkpiaoaars7m5s66urqyopqSin5WLjZKSjoiFe29lXVZTUk1EQUFDRUZJUFhcXF1gZ2xwc3uDiIqNkpeaoaastLu2r66urquoqKikn5KQlZiXko2Ie3RnYFhYU01FRUVFRkhLUFhYWFpgZGlpb3d+gYOIjpCYnKKns7Wuq6urqKikpKSknJKSl5qXko6Ge3FnYFxaVk1ISEhIS0tQVlhYWF1gZ2lqcXuAgIOKjZKYnaKss7Osq6urq6moqKikmJSYnJyYlJCFe29nYF9aU0tISEhJS01SWFhYWF1gZmZqcXl9fYGIipKVnKKssaypqamoqKSkpKSclZSYmpqVlIuBdm5kYF9aUktJSElLS1BVWFhYWl9kZmdudn1+gIWKjZWYn6evr6ypq6moqKamqKSalJecnpqXk4qAdGxmYmBYUE1LS0tLTVJYWFhYXF1iYmdudHl5foOFi5CVnKarqaaopqSkpKKkpp+VlZienpqYkot+dmxpZmRaVVJPUFBPU1pdXFxcX2RmZmpxd3l7foOFi5CUnaaopqSkpKSioaKkopyVl5yenpyYkoh+c25qaWJaVlNSUlJSVlxdXFxcX2JiZGpxc3R3fX2FiIuSnKKin5+fnp6enqGkn5iVmJ6enp6YkoZ+dHBubGRdWlhYVlVWXV9fX19fYmJkZm5zc3Z7fX6FiIuVnKGfnp6enp6enqGinJWVmp6hn5yYkIV7dHFwaWJdWlhYVVVaXV9dXFxdYF9iZWxwcHR3eX6BhYuTnJ6cnJyanJ6an6KinJeYn6GhoZ6YjoZ7dnNzamRfXVxcWFhdYmJfX19iYmJiam5wcHR2eX6BhY6VnpyampqanJqcn6Kfl5ecnqGhn5yTi4J3dHNuZ2BdXFxYVlpdX19dXF9fX19iamxucXR2e36DhpCYmpqampqcnJqeoqKcl5ieoaSioZqSiH55dnRuZ2JfX1xaWl1iYmJfX2BiYGBnbGxuc3N3e4CBiJKamJeXl5eal5ieoZ+VlZqeoaGhn5iQhX55dnFsZ2JfX11cXWBiZGBfYmJiX2JpbGxuc3R2e36BipOXlZeVlJeXl5ien5qUlZqeoaGhnZWNg315d3NuaWZkYl9fZGZpZWJiYmRiYmdqbGxwcHN2e32BipKUlJSQkJSUkpecnJSQlZieoaGhmpWIgX19d3RsaWZmYmBiZmlpZmZmZmZiZmpsbHBwcXN3eX2DjZCQkJCQkJKQlJial5KSl5yeoaGfmJKIgX17d3NuamlnZGJmZ2xqZmZmZmRiZ2ppbGxwcHR2eXuFjY6QkI2NkI6OkpqalJCVl5yfoaGfmI6IgIB9eXNwbGlnZGZnbGxpZmZmZGJiZ2lpbGxwcHN2dnyIi42NjY2NjY2OlZqYlJSVmJ+ipKKfl46Fg4F+eXNwbGxnZmdqbGppZ2ZmYmBkZmdpaWxsbnNzdn6HioqNiouNi4uQmJiVlJSXnJ+kpKKflYuHg4F+d3RwcGxpaWlucGppaWlmYmJmaWlpbGxscHNzd4GHioqKiouLiouSl5WSkJSYnKGipKGYkoiFg4B8dnRwbmppaWxwbmxpaWlnYmRpaWlsbGxucXN0fIOIioqKioqKio2UlZKQkJWYnKGioZ+XjYeFg355dnNzbmxpanBwcGxsamlmZGdpaWlsbGxwcXB0foGHh4eHh4eHh46SkpCNkJSXnp+hoZyTioeDg357dnZzcGxscXNzcHBsbGpmZ2lsbGxsbG5xcHF3foOHh4eHh4eDho6QkI2NkJSYnqGhn5iQioeHgX55dnZzcGxuc3NzcHBwbGdmaWlpamxsbG5wcHF7foODg4ODg4OBiI6QjYqNkJWanqGhn5eNiIeHgX55eXZ0cXBzdnZ0cXBwbGdpamxqbGxsbHBubnN7foGDg4ODg4CBiI6Oi4qOkpecn6GhnJOLioiHg359e3l0cXF2dnZ0cHBwamZpamlpamlpbGxsbnR7foCAgICAgH2Fio2NioqOkpicoaKhnJKLioqHg359fXl0c3Z5eXl0c3NwamlsbGxsbGlsbGxscXZ7foCAgICAfX6Fi42KiouOk5icn6Gel46KioeFfn19eXdzc3Z5eXdzc3FuaWpsbGxsbGxsbGxudHd+gICAgIB+fYGIjYuKio2OlZqeoaGckouKh4eDgH19e3ZzdHl5eXZ2dnFsaWxsbGxsbGxwbGxxdHt+gICAgIB9fYGKioqHiouQlZqeoZ6VjoqIh4WAfX19d3Rzdnl7d3Z2dHFsbGxubG5sbG5ubG5xd3t+gH5+gH57fYOKioeHio2Sl5qfoZyVjoqKiIWAgIB9eXZ3e319d3d5dnBsbnBsbm5sbG5sbG5xd3t9fX19fXl3e4OHh4OHh4uSlZqenpiSi4qKh4OAgIB9eXZ5fYB9eXl5dHFwcHBwcHBscHBsbHB0eX19fX19e3d3foWHhYOHiI6Sl5yenJWOioqIhYOAgIB9eXl7gIB9fX13dHFwcXBwcG5scGxsbHB0d3t7eXl7d3R3gIODg4OFio6UmJ6emJSLioqKhYOAg4B9eXuAg4B9fX13dHBzcXBwcGxwcGxsbnF2e315eXt5dHR5gYODg4OFi46UmJ6cl5CKioqIg4OBg4B7eXyAgX59fXt3cXFzcHBwbmxwbGxsbnN3e3l5e313c3d+gYODg4OIi5CVnJ6alY2KioqHg4CDgX55eX6DgH59fnt2c3Nzc3NxcHBwbmxscXR5fXl5fXt2c3l+g4ODgYWIjZKYnJyYkIqKiIeDgYCDgHt5e4CBgH19fXl0c3Nzc3NwcHBwbGxuc3d7e3l7fXdzdHuBg4GAgYeLjpKYnJqTjYqKiIeDgIODgHt5foODgICAfndzc3Nzc3NwcHBubGxwc3d5eXl5eXRzdHuAgICAgYWKjZKYmpiOioeHh4OBgYODfn1+gYODgYODfnd2dnZ2dnNxc3FwbG5xdHl5eXl5d3Nzd3yAgH5+gYWKjpWYmpONiIeHh4GAg4OBfX2AhYWDg4OBfHl2dnZ2dnNzc3NwcHBzd3l5d3l5dHFxd31+fX1+gYeIjpSXl46Kh4eFg4CAg4OAfX2Bh4WDg4WBe3l2dnZ2c3Nzc3FwcHF0eXl5eXl3dHB0e36AfX2AhYeLkpWalY6Ih4eHg4CBg4N+fX6Fh4ODg4N+eXd2dnZ0c3NzcW5sbnF0d3Z2eXl0cXF0e359fX6BhYiOkpiako6KiIeHg4ODh4N+foGHh4ODh4N+eXd2eXdzc3NzcHBwcHN3eXZ3eXd0cHF3e319fX6BhYiOlZiVjouIh4eFgYGDg4F9foGHhYOFhYF9eXZ2eXZzc3NzcHBwcXR5d3Z5eXdxcHR3fX19fX6DhYqOlZeSjYiHh4eDgIOFg4B+gYeHhYWHh4B+enp6end3d3d0c3JydHh6eHh6enZycnZ6fn56foCBh4mRlJSNiIeFhYGAgIODgX5+gYaGg4SGhIB8e3t7e3h4eHh1c3J0dnt7e3t7eXVzdHh8fnx7foCBhouQlJCLh4SGhIGAgYSDf36AhIaGhIaGg4B8e35+e3h4eHd2dHN2ent7e3t7eXR0dnp9fXt7f3+ChouOkIyHhIKCgYCAgYKBf3+BhoaEhoiEgn99fX99e3t7enl3d3V4fHx8fH18eHV2eH1/fXx9f4CChouPjYqFgoKCgICAgoKBf3+ChYWFhoaDgX9/f398fHx8enl4dXh6fHx6fHx7d3Z3eXx8fHx9f4GDiIyOi4iFgoKCgYCBhYOAgIGFhYWGh4aDgH9/f398fHx6enh4dnh7fHt7fHx5d3d4enx8fHx/f4GDh4uLiYWDgoKCgICDhIGAgIKEhISGhoSDf39/f359fX17enl3eHp9fHt8fXx4dnh4fH19fX1/gIGFiIqJh4SCgoKAf4CCgoB/gYOEhIWGhoSBf39/f399fX19fHt6e319fX1/fnx5eHh8fX19fX5/gIGEh4iHhIKAgIB/f3+CgX9/gIOEg4ODg4KAgICAgH9+fn59fHt7fX9/fn+Af3x6eXt9fn5+foCAgIKFh4eFgoGBgICAgIGBgICAgYODg4OEg4GAgICAgH5+fn59fXx8fX5+fn+AfXx6enx+fn5+foCAgIKFhoWDgYCAgICAgIGAgICAgoODg4SEg4GAgICAgICAfn59fHx9fn9+f4B/fnt7e35/f39/f4CAgYOEhYOCgYCAgICAgIGAgICAgoKCgoODgYCAgICAgICAf39+fX1/f39/gIB/fXx8fX5/fn5+f4CAgIOEhIOBgICAgICAgIGAgICBgoKCg4ODgYCAgICAgICAgH9/f39/f39/gH9/fn19fn9/f39/f4CAgYKDg4GAgICAgICAgYCAgICBgYGBgoKBgICAgICAgICAgH9/f3+AgICAgIB/fn5+f39/f3+AgICAgYKCgoCAgICAgICAgICAgICAgYGBgYGBgICAgICAgICAgICAgICAgICAgICAf3+AgICAgICAgICAgYGBgYCAgICAgICAgICAgICAgYGBgYGAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA=="),
+flute: loadBase64Sound("data:audio/wav;base64,UklGRiQIAABXQVZFZm10IBAAAAABAAEAi0UAAO5WAAABAAgAZGF0YQAIAACBgYGBgYGAgICAgICAgICAgICAgH9+fn5+fn5+fn5+fn9/f4CAgICAgICBgoKDg4ODg4ODg4ODg4OCgoKBgYCAgH9/fn59fXx8fHt7e3t7fHx8fXx9fn5/gICBgYKDhISFhYaGhoaGh4eHhoWFhIOCgYCAf359fXx7enp5eHd3d3d4eHl5ent8fX5/gIGCg4SFh4iIiYqKioqKiomJiIeGhYSDgYCAfn17enl4d3Z1dXV1dXV1dnd4eXp7fH5/gIKDhYaIiYqLjIyNjY2MjI2Mi4mIhoWDgYB/fXt6eHd1dHNzcnFxcXFyc3R1d3h6fH6AgYOFh4mLjI6Pj5CRkZGQj4+PjYuJh4WDgYB9e3h2dHJxb25tbWtrbGxub3FydHd5e36Ag4aIi42PkZSVlpeXl5eWlZSTkY+MiYaDgH57eHRxb21raWdnZmZlZmdoam1vcnV4e3+ChYmMj5KVl5qcnZ6enp2cmpiWlJGOioeCf3t4dHBsaWZkYmFgX19fYGJkZmlscHR4fICEiIyQlJebnaCjpKWlpKOhn52al5OPioaBfXl0cGtnY2BdXFpZWVlaWl1fYmZqbnR4foKHjJGVmp6hpKerrKysq6qopaKemZWQioWAenVvamVfXFhVU1JRUVJTVFdaXmNobnN5f4SLkZedoqaqrbCytLS0srCuqqahm5aQiYN9d3BpY15YVFBNS0lJSUpMT1BVWmBmbXR7gYiPl56kqa6ytbi6vLy7ubezrqmjnZaQiIF5cWliXFZQS0hEQkFBQkNGSU5TWWBnbnV9hI2UnKKprrO3u72/v7+9u7izrqminJSNhX51bmdgWVNOSkZDQkFBQkRHS1BWXGJpcXiBiJCXnqWrsLW5vL6/v769uraxrKagmZGKgXpya2RdV1FMSEVCQUFBQ0ZJTVJYXmVsdHyEi5Oaoaets7e6vb+/v767uLSvqqSdlo6Gf3dvaGFaVE9KR0RCQUFCREdLT1RaYWhweH+HjpadpKqwtbi8vr+/vr26t7Ktp6GZkouDfHRsZV5XUk1JRUNBQUFDRUhMUVddZGxze4KKkZmgp62ytrq9vr+/vry5tbCrpZ6Xj4iAeHFpYltVUEtHREJBQUJDRkpOU1pgZ292foWNlJyjqa+0uLu9v7+/vbu3s66oopuUjIR9dW1mX1lTTklGQ0FBQUJESEtQVlxjanJ5gYiRmJ+mrLG1uby+v7++vLm2saymn5iRiYF6cmpjXFZRTEhEQkFBQUNGSU5TWV9mbXV8hIyUm6KorrO3u72/v7++u7i0r6mjnJWOhn52b2dgWlRPSkZDQkFBQkRHS1BVW2JpcHiAiI+XnqSqsLW5vL6/v769urayraegmZKKgntzbGReV1FMSEVDQUFBQ0VJTVJXXmRsdHyDi5KZoKetsre6vb6/v768uLWwqqSelo6Hf3hwaWJbVE9LR0RCQUFCREdKT1RaYGhvd3+GjpWcpKqvtLi7vr+/v726t7OuqKKak4uEfHVtZl5YUk1JRkNBQUFCRUhMUVZdZGtyeoGJkZigpqyxtrm8vr+/vry5tbGspZ6XkIiBeXJpYlxWUEtIREJBQUJDRklOU1lgZ251fYSMlJyiqa6zt7u9v7+/vbu4tK6popyUjYV+dW5nYFlTTkpGQ0JBQUJER0tQVlxiaXF4gIiQl56lq7C1uby+v7++vbq2saymoJmRioJ6cmtkXVdRTEhFQkFBQUNFSU1SWF5lbHR8hIuTmqGnrbK3ur2/v7++vLi0r6qknZaOhn93b2hhWlRPSkdEQkFBQkRHS09UWmFob3h/h46WnaSqsLW4vL6/v7+9ureyraehmpKLg3x0bWZfWFNOSkdEQ0JDREdKTlJYXmVtdHuCiZCXnqWrr7S3uru8vLu5trKuqaOdlo6HgHlya2ReWFNPS0hGRUVGR0pNUlZcYmlwd36FjJOaoaasr7O2uLm6ubi2sq+qpZ+YkouEfnZwaWJdWFNPTEpISEhJS05RVVtgZ210eoCHjpWcoqerrrK0tre3trSyr6umoZuVjoiBe3RtaGJdWFRQTkxLSktMT1FVWl9kanB3fYOKkZedoqerr7GztLS0s7Gvq6einZeRi4V/eHJsZmFcWFVRT05NTU5PUlVZXmJobXN6gIaMkpidoqerrq+xsrKxsK6rp6OemZSOiIF8dnBqZWFdWFVTUVBQUFFTVlldYWZrcXZ9goiOk5meoqaqra+ur6+uraqnpJ+blpGKhYB6dG9qZV9cWFVTUlFRUlNVWVxgZGludHp/hImPlJmdoaWoqqurq6upqKajn5uXkYyHgn55dG9qZWJgXVtZWFdYWFpcYGNmam9zeH2AhYqOk5eanaCipKWmpaSjoZ+cmZaRjYmEgH14dHBsaWVkYmBfXl5fX2FjZWlscHN3e3+ChoqNkJOWmJqcnZ6enJybmZeVko+MiYWCf3x4dXJvbWtpamhoZ2doaWpsbXFzdXh7fYCDhoiKjY+RkpSVlpaWlpSTkpCOjIqIhYOAf3x6eHZ0c3FwcHBvb29wcXFzdHZ4ent9f4GChIaIiYqLjI2Njo6OjoyLiomIh4aEg4GAf318e3l4d3Z2dXZ2dnZ2d3h4eXp8fX5/gIGCg4SFhYWGh4eHh4eHh4aFhYSEg4KBgYCAf39+fn19fHx8e319fX19fX1+fn5/gICAgICAgYGBgYGBgYGBgYGBgYGAgICAgICAgICAgICAgICAgICAgA=="),
+boing: loadBase64Sound("data:audio/wav;base64,UklGRjQeAABXQVZFZm10IBAAAAABAAEAjEUAAO9WAAABAAgAZGF0YRAeAACAgICAgICAgICAgICAgICAgICAgICAgYOIkKK9cT84OjhYeoiqs6+rqot4cF5FR1BKUnJ/iaOvp6enjndvYkxOV1logouTpq6mnpqFcmpgU1RlZ3KDkJCVk3VYRm/O1N7TnXxSOyQzNkZ0laS10868tZx7X1c8NEhXZX+mrr3JvKiXhV5PSEBAUmZ0k6awsrerlYNyXEtKSE1gdISVqKuqp5iDdWdVTVRYY3SGk6OutLS8rVMoJhkrUnOLs77Aw7+aiXpdQkVEQVJueIyosrC1sJuBel1KS01PXHuFlqiyq6eji3xvYU9PWl5vgIuOm5Z6YVGVys7LwYBsSi0uPD9RiaCsvtPFtK6Ja1xRNzdUXHGRq7G+ybWckHlbTkk+Rlxvfpitr7S0o41/aVFLTEtVan2LoKqqqaSQe29fUVBVXGl+jpmnsa2ssqRbKyAbKFFxia/EwsfJnot2YT07PTlNaX2LrLq0t7GcfXRYRUVLTFt7i5uutrGpood0Z1tMTVlfcIKNlJ6Zel5mr8bGwqtyXUUqNUlNY5GkrMDGs6effl5ZTz9HXml8nq2wu76jkYNrU09MRVJreYehrqyuqJKAdV9NT1NVY3mIkqWpop+Xg3NpW1RXXWZxh5Gdp6qnoqaacTQgHyVObY+ux8fKx6CJc189Ojw8UGiAjq68t7ewnH1xV0NBSFBffo+grrmzqaKGdWNZTEtWX22Cj5admIJkbbC7v7ScdVlKMz9QWnKYpqy7vaibknZcV1BIUWhzhKCrrLSxmoh6ZFNRTk5fdYKQoqmmpaCHe2tfUFNaXnCAjZWjpZyYjH1tZ1pXXmdwe42TnaOhnZiWk3lDKiYrT2qPrMbJycSjinBdPzs+QVJpg5Kvu7i1rpiAbFlEQ0lSYHyQobC2sqmeiXNiV01MWGJzhJOZnpiCaXCqtritlnNbTDpGV2J4m6eruLeimIxzW1hSTlhseISiqqquqpiBe2FUUlRVYXiBk6GnpKGbg3ZpXVFVXmN2g5CWoqKWk4Z7amRbWmFqdYCPlZyhnJaSjo6DTzcuMUtjg6G6w8XArY93YU0/QUROZXyPo7a3s6ubgm9cS0NKU2B3jZ2qs7GonYx3ZlpSUFljcoKQmZuYhG5wo7W1q5Z0XE49QFZgeZSprba5opaJeFpYUk1ZanuHoaysraiWgHhfU1JVVmN7hJSjqaWgl4J1Z1pSVl9leIaTmaKilZCDeGhiXFtha3OAjpecoJ2UjYmHiWhENjhEXn6Ys8HBu6+Ue2dUQkJIUWJ7jZ6uuLKqnYhxYVFISlRhdYqaprCwp5uNemtcVVBUYmx/i5ealYtxa5uxtK6ae19RQUFXX3eOp6m0uKeai3xfWlRQV2h4hJ6pq6yomYN7YlZTVldheIGRoKekoZqIeGteVlddZHKDjpegoZqSiHtuZV9aYGhxfY2Vm5+clY6Hg4R1Uz89QlZzj6e6v7qwn4FtWktDRk5bcYaXprGxrKCSd2pZTklQX2qCkaGprqudk4BxYlpTVV9qeISSlpWOd22UsLawoIZmVkQ+UFlvhKKptLmtoJGEZltVTlFgcX+TpquurqCOgG1cVFRSXG19ipqkp6Wfj31wYldUWV1sfYqTn6OfmI6AcWhfWlxja3iHkpmfnZiRioOBf2FHQEBLYoSVsbu7taeSdmhTSEhNV2N/i5+qsKujmX9wYFVMTVtkeoiZoauroZeIemhhVlReZnN9jJKTkHtvi621sKWOcFtLQUtXZn6Zpa24sqKWh3BeV1BPXGx6jqGoqq2kkoNzYFZVU1hpeIWWoaSkoZOCdWhZVVldaXqHkJqhnpqRhHhsZFxcZGl2g4+XnJ6alIyFgIdzVUA/QVV5jKm6vbuxoH5xXE1ESVFadYWYprSyp6GLemVaS0pVXXCAlp6qrqaek4JxZFtUV2BqdoWRlJWMfH+hraefjXNdU0ZOXGp8l6SrsrCgk4VxYFpVVF9xfYyfpqeooI6AdGNYWVldbX2Glp+joZySfnVnXVdbYmp8h5GYnZyUjoB2amVeX2dtfIWSmJublI6HgX+GhmVFPj9Ia4Oet8C/ua2FdV5PQURMVW6ElKSytq2klHppW05HUV1qfpShqbCqoJKCbl9ZUlVhbXuKlpyclIR8kJ2YkYZxYVxVW2x5hpmlpaOfkYJ5bmJfYWVwfImSnaGalo+Ecm1iXWJpcnqKkJOZlo+HgHFqZWRianZ9iZGVlZONgHpybGdpbHB8gYmOkpGOioF9eHl/iZ2EXUpCQlt5kKq6uLOpj3VkVkdIU1tshJSfrLClmYx2ZFtTTlhodYaao6iqoZKFdmZbW11hb32KlZ6elo5+cnmIh4SBfHFwcnJ9gYmNlJGKioF6d3dxcXd6foOKio2NhoKAfXR0dHJ4fYCBiYmFhYN/enl2cXV3eH2BhYaIhYJ/fXh2dnd4en+AgYWDgoKAfXx8fH+DjJaknG9PQTpGZoKgt7y4sJh7Z1VIRU1abYWYo62vopOEb1xRUFFgdISUpKunoZmCdGZdV11pcoSRnaChmYqAcmtrcHV4gIaKjZKPi4h/enZzcnV6f4aLj4yKhn96dnNydXh9g4iLi4mDf3p2cnJzdnqAhomLiYN/enZycHN3fYGGiYqJhYF9eHV1dXh8gIOGiomGg4CAgIOMn6qAUTotNleBpcTNxrSSbVI8MjpPaYKjsry5o490XklFS1V0h5+stK2cjXJiVlJZZn+NoKmpoZCCbmRcX298iouNkZOSjYZ8dGxrcHN+h5CSlJCEf3NsaGxweYOLkJGMhn12cG5vc3uBh4yMiIR9d3Jycnd9gYaIiISBfXh2dnh7gIaIioeDfnh2dXZ6gIaLjIqGg4KChJKrnlw/KitQerDN28qniEsxJytPcqG3ysWjiWFIOj9VcJiqubmji21bS05kdZOlsKyejHFhVFRldo6eqaibjXZnW1dgcoibp6qdinVjWFppfI+fpJ+PfWlbWWFzhZWfnJKBcWVgZXB/jpeYkYN1amVoc4CMk5KMgHVraW13hI6Tko2Ad29rcXeEipGRiIB0b290gomSlpaTmZpnQi8xWIbF2de6eE8mJThhn8DWyJhxQC41ToKjwsSoil1IQE11kLG7sZp6XU9SZoScrKubgWpcXGl+lKKdkoV2amVteomWmpWIeW1nbXiFkpeShXltZ2t1hI2SjYR6cW9zeoOIiYR9d3Nzd3+FiYiBfHZzdHl/g4eGgX96eXp9gIKCgn99fHx/f4KCgIB/f3+AgoWFh4yUhmRNTmmHuMCojV1CP1WBmrWylnJWS1VxkKaklHtjWV10ipqflYBtY2d0hpSZkoR1bWx2gouQjIN6c3R6gomRlIh7cm90go2SjoR8dHR8hYuLiIJ4c3R7gYaLiH97d3Z7f4OFgX16ent9gYKAf3t6enx/gIB/fHx8fH+AgIB/fHx8fX+AgH9/fHx8f4CAgIB/f3+AgYOGiot7ZGFwgpWmmHxjXWd2ipiTg3JqcHqDiYeAdnN5f4OFgXt3d3yDh4aCe3d4fYOIhoJ8eXh8gYODgHt3dnmImZiIcmxqdI+cl4h0cHR+kJSMf3JweoKMkId+dHR8gomIgXt2d36DhYN9enh5f4KCgHx6enx/gIB/fHp8f4CAf318fH1/gH99e3p8f4GCgX99fHx/gIKCg4WKhXFmcH+MmJSAa2Ftf42Ri31va3SCi4yEe3RzeoKIhn95eHl+g4eDf3p6fYGFhYF9enp9gIKBfXp4eHp7hZWUhG1qb3qUnpGAbm56hJKShXpydoKIi4h8d3d8h4qGgHl4e3+GhoB8enp9gYKBfXp7fX+Bf317enx/gYB+e3p7fYCAgH17e3x9gICAf3x8fX+AgICAgIGDhoh7bG15h5OVhnJkanuKko9/dGxygIiLhnp1dXqEiIV/eXd6f4WFgX17fH+ChIJ+fHt9gIKAf3t6e3t9fYSRlYhvaGx4lJ2TgW9ueoWUkoJ2cnaAio6IfHV2foWIhn95eH2DhYR/enl8gIODf3x5fH+Bgn99e3t+gIKAfnx7fX+AgH9+fX1+f4B/f359f3+AgIB/f4CAgoOGhHVscXyMlpCAa2ZxfY6Th3xubnmCjYuAeXN1foWIhHx4eHyDhoWBfHl8f4SEgX97e36AgoF+fHp6e3yBkJqQeGRicIugn4x2Zml7j5mQgXJtd4WPj4V6c3R9iIyHfnd1eoGHh4F7d3h+goaCfnp5e3+Bgn98ent+f4CAfnt7fH6AgH9+e3t9f4CAf359fX9/gICAf39/g4SAd3J1gIqSjH1zbXF/iI6KfndxdH6Giol+eXV4foSIhn98eXp9g4WFgX57e36BgoKAfXt7fH5/fXp4fIucmoRqWl13laamj3JhYXOLnZ6Qe2tmdIaUmI5+cWx0gYySi391b3J9hoyLgHlyc3uCiYmCfHRzeX6FhoN+eHd6foOEg397eXp8gIODgX58e3x/gYSCgH59fX+BgoJ+e3t+goWFg3x6eXp+goSEgH17e31/goKBf359fX5/goKBf399fX+AgICAf399fX1+fn18enh2dXuKoaWUeV5QWnSTra+ghWlZXGuHmaWfiXlmY3B8kJiVjHxybG97hIyOh4F3c3N3f4OIh4N+eHZ4en+ChISBfnp4eXx/gYSCf357ent9gIKCgn9+fHt9f4CCgYB/fnx9foCCgoF/fnt7e36Ag4SDgX58e3t+gIOEg4F+fHt8foCCgoGAf399fX5/f3+AgH9/fHp6eXh4dnZ4iJ6tqpF4VUlMXoegub2pkWtXSVBsg6OwsKOHclpUXGmElqWmmIhwYlpebn2Rmp2WhXhnYmRrfIaSlpKKfXFpZ2x2gYuQkYuCd29tbnR9hIuNi4R+eHNzdXl+hIaFf36DhoaEf3p1c3V5foSKi4qFgHl1dHV5f4SHiYaDf3x5eHp6foGEhYWEgH97enp8fH1/fn18d3Vzc4KXqq2ikXBdTU1fcpCks7OnlnlnWFZcaYGQo6iknIh4ZV5aYXJ/jZuenJKEdWhhYGdzgI2WmZaNgHVrZWVsdYCKkpSSioF4b2pqcHiAiY6Sj4qCenRwcHR4foOIiYaCgYOEgoB9eXd2d3x+hIaJiYaEf3x5eHh6fH+ChIWFhIN/fnt5eHl8foGDhIWEgn98eHV0c3R1d3uDkqappJh+bVhRVF50hJumrKqgkH9tYVpcZHKCkZ2jo5yQgXNmX19jbnyJlZudmI6CdmpkZGdueYOOlJaUjoR7cWpmaG53gIiPk5KPh352b2trbXR6g4qQkZCLg352dHFxcnR6foaLjpCMiIF8dXBwcXZ6goaLjYyKhIB5dnRzdHh8f4aHioqHhH57eHV1dnl7foGCgn98fIKMk5SPhXpwaGZpcHqEj5SXlZCIf3dwbGxvdX2FjJGSkYyGf3dxbW5xdn2Ei4+RjomCfXdzcHBzeH2EiY2NjIiBfXh0cnN2eX+DiYuMioaDfHl1dHZ4fYGGiYyNjIuCeW1pZWhze4iQl5qWkIN9cGtnaG1zf4aPlJWTjIR8dW9sbHB1foSMkJKQi4R/eHNwb3J3fYKGioqJiYuKhn96c29ucXZ+hIuPkY6Jg312cnFxdXp/hYmNjYqFgH12c3JzdnuAhYqLioeCf3h2cnR2eoCCh4iJh4KAe3h2dnd6f4CEhoaGhIB/e3l3eXp9gISGiIiHhoWGg3xuZ2NkbnqHk5qdmpCFeG1kYmRrdYKMk5iWkYh+c2toZ210foiQlZWSi4J6c25tb3R8hIqPkY+KhIB9eXZ1dnl+goiLjo2KhX96dXR1d36Bh4uMi4eDfXh1c3V3foCHiYuJhYB7eHV1dnh/gIWHiIaEgHt5dnZ5eoCChoeHhoKAe3p4eHt9gIKFhoWEgH98e3t+gISIjY+GeGtkYWh1gpCZnZmRg3drY2NocX2HkJWWkYd9c2tpanB6g4yTlJGKgnpybm9ze4CKjpCPioR9eXV1dXZ7gIeNkZGMhnx2cG9yeIGHjpCOioF7dHFxdHuAiI2Oi4R/eHRyc3l+hIiKioaBe3dzc3d7gYaJioeCfnl2dXZ7f4SIiYeDf3x4d3d6foKFiIaFgH17e3x/hIuQjn5waGRndIORmpyWjHtvZWJncn+MlZaSiYBybGhpdH2Ij5ORiYJ3cW5ud36HjZCPiIJ5dXN1e4CGh4aFg4KAgH19fX2AgIOEg4KAf318fX6AgIODgYB+fXt7fH6AgIGBgIB9fXt9fYCAgICAf359fX1/gICAgIB/fn5+gICAgYGAgH9+fn5/gICBgYGAgH9+f4CAgoSGiImBdnBsbXiCkJaWkIJ3aWVqcYKMlJWNhHZuaWt1foqQkY6Ce3FvcXaBiI6PiYR7dXNzeoCGioqHgn9+fn19fn+Ag4SFhIKAfXx8fYCChISEgoB9fX1+gIGCg4KAf319fn+AgYGAgH59fX1/gIGBgYB/fXx8fX+AgYGBgIB+fX1+f4CAgICAgH5+foCAgICAgICAgICAgYOEg355dnZ6f4aLi4iAe3NydXqCiIyLhX93dHR3foKIi4eCfXh1dnx/hYiIhYB8eXh5fICDhIJ/fH2Bh4qIgnt0cXR8hIyQjod+dnJzeoGJjo6JgXp1c3d+hImMiYN9d3R2eoCFiIiEf3t3d3p+goWGhIB9eHh6fICDhYSCf3t5eXt/gISEg4B9fHt7fYCDhIOCgH59fX6AgoODgH17e3yAgoSFg4B9e3l6fYCDhYSDgH17e3t9gIOEhIKAfXx7fH6AgoSDgX99e3t8fX+AgICAhoyNioJ4cG1weoSOlJOMgndwbnN8hY+SkYl/d3FxdXuGi4+Nhn93cnJ2foKJi4mFfnl1dXh8goeJiIJ/eHZ2eH2AhYeFg397eHd6fICEhoWDgHx7ent9gIOEhIOAf3x8fH1/gIKDg4OAgH18fH1+gIKDg4KAgH18fH1/gIKDg4KAf318fH1/gIGCgYB/fXx8fHx9fX1+gYaOkI2GfHJsa298hZGWlJCDe3Btb3R/h5GTkYuAenFvcneBho2QjId+eXJydHmAhouMiYV+eXRzdXmAhYiLh4V+enV1d3qAg4eIh4OAe3l4eHt+g4aHhoSBfnt5eXt9gIGCg4SFhIKAfnt5eXt+gIOFhoWDgHx6eXl7foCDhYWDgX98enp7fYCBgoOCgX99enl5eXt8f4CIj5GRioN3cGlqcXmFjpWXkoyAeXBtb3N8goyQkY+IgXlzcHB0eoGGjY6LiIB7dHFxdHuAhYmLioaBfHd0dHZ6f4OIiYiGgn96d3d3e3+BhIeIhoKAfXt5eXt+gIKDhIOBfXx+gIKDhIKAf3x8fHx+gIGDhISDgYB+fXx8fX+AgYKDg4KAgH99fX19fn+AgICAfn18enx+hYuPj4yHfXZwbnB0fIKLjpGQi4Z/eXNycnV7gIeLjY2LhoF8d3NzdHh+goaJi4mGgX56dXV1eHyAg4aIh4WCf3x5dnZ4e36BhIaHhoSBf3x6eXl7fYCChYaGhYOAfnx6ent8f4CBg4SEhIOBgH59fHx8fX+AgoOEg4KBgH59fX19fn+AgYKCgoGAgH9+fn19fX5/f4CAgIOGiYmHhX98d3V1dnp/g4eKi4qHg397eHZ2eHt/goaIiYiGgn97eXd3eHt/gYSGiIaEgX98eXh4eXt+gYOFhoWDgX98enl5ent+gIKEhYWDgX99e3p6e31/gYOFhYWDgYCAgH17eHh3eH2AhYeKioiFgH55d3Z2eHuAgoWHiIeEgn58eXh4eXx+gYSGh4aFg4B9e3p6e31/gIOFhoaFg4F+fHt6e3x+gYOEhoWEg4B/fHt7e31/gIKEhYSDgX99fHt7fH5/gYKEhIOBgH59e3t8fH6AgYKDg4GAf359fH19fn+AgYKCgYGAf35+fX5+f4CBgoKDgoKCg4OAfXh2dXV6foOHiouJh4F+eXZ1dXd8f4OHiIiGg398eXd3eXx/goWGh4aEgX99e3t8foGDg4KAgICAgIGCgYGAgH9/f4CAgIGBgYGAgIB/f39/gICAgICAgICAf39/f4CAgICAgICAgH9/f39/gICAgYGAgIB/f39/f4CAgIGBgYCAgH9/f39/gICBgYGBgICAgICAgoSFhH96d3V1eH2BhomLiYWBfHd0dHd7f4SHiYiEgXx4d3d5fYCDh4iHhIF+fHp6fX+DhYeGg4F9e3p7fX+DhYeHhIJ+fHl5fH6Bg4aGhIJ/fXp6e32AgoSFg4J/fXp6e32AgoSFg4J/fnt7e32AgYOEg4KAfnx8fH6AgYKDgoKAf319fX+AgYKCgoB/f35+f4CAgoKCgoKCgoJ/e3h3eHt/hIeJiIWBfHd1dnp/g4aIhoN/end3eX2BhIaGhIJ+fHp6fH+ChYaFg4F/fX19fn5/gYSFhYSBf3x7fH2AgoWFhIJ/fHt8fX+ChIWDgX98fHx9gIGDg4KAfn18fX+AgYKCgH9+fX1+f4GCgoKAf319fX+AgYKCgYB/fn5+f4CCgoKAf39+f3+AgYKCgYCAgICBgH99fHx+gIOFhYSBfnt6en1/g4SEg399enp7foGDhISBf317fH2AgoSEgoB/fX19f4CCgoKCgoB/fn5+f4GDg4OBf35+fn+AgoOCgX9/fn5/gIGCgoGAfn5+f4CBgYGBgH9+fn+AgIGBgICAf39/gICBgICAgH9/gICAgYCAgIB/gICAgIGAgICAgICAgICBgICAgICAgIGAgH9+foCAgYKCgYB+fn5+gIGCgoGAf35+foCBgYKBgIB+fn6AgIGBgYCAf35/f4CAgYGDg4GAf3x8fH+ChIWEgX98fHx/gYSFhIF/fX1+f4GDg4KAf359fn+BgoOCgH9+fX5/gYGCgYB/fn5+f4CBgYGAf39/f4CAgYGBgIB/f3+AgIGBgYCAf3+AgICBgYGAgICAgICAgYCAgH9/gICAgYGAgH9/f3+AgIGBgICAf3+AgICBgYCAgIB/gICAgICAgIB/f39/gICBgoOCgH99fHx/gYOFhIKAfnx8foCDhISDgX99fX5/gYOEgoF/fX1+f4CCgoKAgH99fX+AgYKCgYB/fn5/gICBgYGAgH9/f3+AgYGBgIB/f39/gICBgYCAgH9/f4CAgIGBgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYKDgoB/fXx8foCChIWEgX99fHx+gIKEhIOBgH19fX6AgYODgoB/fn19foCBgoKCgH9+fn5+gICCgoGAf39/f3+AgIGCgYCAf39/f4CAgYKBgIB/f39/gICAgYGAgIB/f3+AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGCg4KBgH59fH1+gIKEhYSBgH59fX1/gIKDhIOBgH59fX5/gIKDg4KAgH59fX6AgIGCgoGAgH5+fn6AgIGCgoGAgH9+fn+AgICBgYGAgH9/f3+AgICBgYGAgIB/f4CAgICBgYGAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBgoKCgYB/fn19foCAgoODgoGAf35+fn+AgYKDgoKAgH9+fn+AgIGCgoKAgH9/fn9/gICBgYKBgIB/f39/f4CAgYGBgYCAf39/f3+AgIGBgYCAgH9/f3+AgICBgYGAgICAgICAgICBgYCAgICAgICAgICBgYGAgICAgICAgICAgYGBgICAgICAgICAgICBgICAgICAgICAgICBgYGBgIB/f39/gICBgoKBgICAf39/gICAgYGBgYCAgH9/f4CAgIGBgYGAgICAf4CAgICBgYGAgICAgICAgICAgYGAgICAgICAgICAgIGBgICAgICAgICAgICBgICAgICAgICAgYGAgH9/f3+AgIGCgoGBgIB/f39/gICBgYGBgICAf39/gICAgYGBgYCAgICAgICAgIGBgYGBgICAgICAgICAgYGBgYCAgICAgICAgYGBgYCAgICAgICAgIGBgICAgICAgICAgIGBgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGBgYGAgH9/f39/gICBgoKBgIB/f39/gICBgYGBgICAf39/gICBgYGBgICAgICAgICBgYGAgICAgICAgICBgYCAgICAgICAgICBgICAgICAgICAgICAgICAgICAgICAgICAgICA")
+};
+built_in_sounds.harpsichord.freq = 218;
+built_in_sounds.flute.freq = 388;
+built_in_sounds.boing.freq = 148;
+}
+
+function kill_audio()
+{
+if (!audio_context)
+return;
+
+clearTimeout(audio_context.soundStopTimeout);
+audio_context.suspend();
+audio_context.close();
+audio_context = new (window.AudioContext || window.webkitAudioContext || function(){})({ latencyHint: 'interactive' });
+unlock_audio();
+audio_context.resume();
+sim.sound = '';
+}
 
 function unlock_audio()
 {
+check_audio();
 if (audio_context.unlocked)
 return;
 
@@ -2986,18 +3455,10 @@ window.removeEventListener('pointerdown', unlock_audio);
 window.addEventListener('touchstart', unlock_audio, true);
 window.addEventListener('pointerdown', unlock_audio, true);
 
-function restart_audio()
-{
-audio_context.suspend();
-audio_context.close();
-audio_context = new (window.AudioContext || window.webkitAudioContext || function(){})({ latencyHint: 'interactive' });
-unlock_audio();
-audio_context.resume();
-sim.sound = '';
-}
-
 function loadBase64Sound(base64snd, errorCallback)
 {
+check_audio();
+
 // strip any "data:audio/wav;base64," style prefix
 base64snd = base64snd.substr(base64snd.indexOf(',') + 1);
 
@@ -3020,9 +3481,11 @@ return bytes.buffer;
 }
 
 function playSnd(sound, freq, delay=0) {
-if (!sound.ready) return
-let source = audio_context.createBufferSource()
-source.buffer = sound.snd
+check_audio();
+
+if (!sound.ready) return;
+let source = audio_context.createBufferSource();
+source.buffer = sound.snd;
 source.connect(audio_context.destination);
 
 source.playbackRate.value = ((sound.freq && sound.freq/261.616) || 1) * ((freq && freq/261.616) || 1);
@@ -3031,6 +3494,8 @@ source.start(audio_context.currentTime + delay/1000, 0);
 
 function perform_play_note(freq, time, delay=0)
 {
+check_audio();
+
 var gainNode = audio_context.createGain();
 gainNode.connect(audio_context.destination);
 
@@ -3099,17 +3564,6 @@ if (i == -1 || note.length < 2) return prevDuration;	// length < 2 disallows pla
 return Math.pow(2,-(i)) * (dotted ? 1.5 : 1);
 }
 
-var built_in_sounds = {
-beep: loadBase64Sound("data:audio/wav;base64,//uQRAAAAWMSLwUIYAAsYkXgoQwAEaYLWfkWgAI0wWs/ItAAAGDgYtAgAyN+QWaAAihwMWm4G8QQRDiMcCBcH3Cc+CDv/7xA4Tvh9Rz/y8QADBwMWgQAZG/ILNAARQ4GLTcDeIIIhxGOBAuD7hOfBB3/94gcJ3w+o5/5eIAIAAAVwWgQAVQ2ORaIQwEMAJiDg95G4nQL7mQVWI6GwRcfsZAcsKkJvxgxEjzFUgfHoSQ9Qq7KNwqHwuB13MA4a1q/DmBrHgPcmjiGoh//EwC5nGPEmS4RcfkVKOhJf+WOgoxJclFz3kgn//dBA+ya1GhurNn8zb//9NNutNuhz31f////9vt///z+IdAEAAAK4LQIAKobHItEIYCGAExBwe8jcToF9zIKrEdDYIuP2MgOWFSE34wYiR5iqQPj0JIeoVdlG4VD4XA67mAcNa1fhzA1jwHuTRxDUQ//iYBczjHiTJcIuPyKlHQkv/LHQUYkuSi57yQT//uggfZNajQ3Vmz+ Zt//+mm3Wm3Q576v////+32///5/EOgAAADVghQAAAAA//uQZAUAB1WI0PZugAAAAAoQwAAAEk3nRd2qAAAAACiDgAAAAAAABCqEEQRLCgwpBGMlJkIz8jKhGvj4k6jzRnqasNKIeoh5gI7BJaC1A1AoNBjJgbyApVS4IDlZgDU5WUAxEKDNmmALHzZp0Fkz1FMTmGFl1FMEyodIavcCAUHDWrKAIA4aa2oCgILEBupZgHvAhEBcZ6joQBxS76AgccrFlczBvKLC0QI2cBoCFvfTDAo7eoOQInqDPBtvrDEZBNYN5xwNwxQRfw8ZQ5wQVLvO8OYU+mHvFLlDh05Mdg7BT6YrRPpCBznMB2r//xKJjyyOh+cImr2/4doscwD6neZjuZR4AgAABYAAAABy1xcdQtxYBYYZdifkUDgzzXaXn98Z0oi9ILU5mBjFANmRwlVJ3/6jYDAmxaiDG3/6xjQQCCKkRb/6kg/wW+kSJ5//rLobkLSiKmqP/0ikJuDaSaSf/6JiLYLEYnW/+kXg1WRVJL/9EmQ1YZIsv/6Qzwy5qk7/+tEU0nkls3/zIUMPKNX/6yZLf+kFgAfgGyLFAUwY//uQZAUABcd5UiNPVXAAAApAAAAAE0VZQKw9ISAAACgAAAAAVQIygIElVrFkBS+Jhi+EAuu+lKAkYUEIsmEAEoMeDmCETMvfSHTGkF5RWH7kz/ESHWPAq/kcCRhqBtMdokPdM7vil7RG98A2sc7zO6ZvTdM7pmOUAZTnJW+NXxqmd41dqJ6mLTXxrPpnV8avaIf5SvL7pndPvPpndJR9Kuu8fePvuiuhorgWjp7Mf/PRjxcFCPDkW31srioCExivv9lcwKEaHsf/7ow2Fl1T/9RkXgEhYElAoCLFtMArxwivDJJ+bR1HTKJdlEoTELCIqgEwVGSQ+hIm0NbK8WXcTEI0UPoa2NbG4y2K00JEWbZavJXkYaqo9CRHS55FcZTjKEk3NKoCYUnSQ 0rWxrZbFKbKIhOKPZe1cJKzZSaQrIyULHDZmV5K4xySsDRKWOruanGtjLJXFEmwaIbDLX0hIPBUQPVFVkQkDoUNfSoDgQGKPekoxeGzA4DUvnn4bxzcZrtJyipKfPNy5w+9lnXwgqsiyHNeSVpemw4bWb9psYeq//uQZBoABQt4yMVxYAIAAAkQoAAAHvYpL5m6AAgAACXDAAAAD59jblTirQe9upFsmZbpMudy7Lz1X1DYsxOOSWpfPqNX2WqktK0DMvuGwlbNj44TleLPQ+Gsfb+GOWOKJoIrWb3cIMeeON6lz2umTqMXV8Mj30yWPpjoSa9ujK8SyeJP5y5mOW1D6hvLepeveEAEDo0mgCRClOEgANv3B9a6fikgUSu/DmAMATrGx7nng5p5iimPNZsfQLYB2sDLIkzRKZOHGAaUyDcpFBSLG9MCQALgAIgQs2YunOszLSAyQYPVC2YdGGeHD2dTdJk1pAHGAWDjnkcLKFymS3RQZTInzySoBwMG0QueC3gMsCEYxUqlrcxK6k1LQQcsmyYeQPdC2YfuGPASCBkcVMQQqpVJshui1tkXQJQV0OXGAZMXSOEEBRirXbVRQW7ugq7IM7rPWSZyDlM3IuNEkxzCOJ0ny2ThNkyRai1b6ev//3dzNGzNb//4uAvHT5sURcZCFcuKLhOFs8mLAAEAt4UWAAIABAAAAAB4qbHo0tIjVkUU//uQZAwABfSFz3ZqQAAAAAngwAAAE1HjMp2qAAAAACZDgAAAD5UkTE1UgZEUExqYynN1qZvqIOREEFmBcJQkwdxiFtw0qEOkGYfRDifBui9MQg4QAHAqWtAWHoCxu1Yf4VfWLPIM2mHDFsbQEVGwyqQoQcwnfHeIkNt9YnkiaS1oizycqJrx4KOQjahZxWbcZgztj2c49nKmkId44S71j0c8eV9yDK6uPRzx5X18eDvjvQ6yKo9ZSS6l//8elePK/Lf//IInrOF/FvDoADYAGBMGb7 FtErm5MXMlmPAJQVgWta7Zx2go+8xJ0UiCb8LHHdftWyLJE0QIAIsI+UbXu67dZMjmgDGCGl1H+vpF4NSDckSIkk7Vd+sxEhBQMRU8j/12UIRhzSaUdQ+rQU5kGeFxm+hb1oh6pWWmv3uvmReDl0UnvtapVaIzo1jZbf/pD6ElLqSX+rUmOQNpJFa/r+sa4e/pBlAABoAAAAA3CUgShLdGIxsY7AUABPRrgCABdDuQ5GC7DqPQCgbbJUAoRSUj+NIEig0YfyWUho1VBBBA//uQZB4ABZx5zfMakeAAAAmwAAAAF5F3P0w9GtAAACfAAAAAwLhMDmAYWMgVEG1U0FIGCBgXBXAtfMH10000EEEEEECUBYln03TTTdNBDZopopYvrTTdNa325mImNg3TTPV9q3pmY0xoO6bv3r00y+IDGid/9aaaZTGMuj9mpu9Mpio1dXrr5HERTZSmqU36A3CumzN/9Robv/Xx4v9ijkSRSNLQhAWumap82WRSBUqXStV/YcS+XVLnSS+WLDroqArFkMEsAS+eWmrUzrO0oEmE40RlMZ5+ODIkAyKAGUwZ3mVKmcamcJnMW26MRPgUw6j+LkhyHGVGYjSUUKNpuJUQoOIAyDvEyG8S5yfK6dhZc0Tx1KI/gviKL6qvvFs1+bWtaz58uUNnryq6kt5RzOCkPWlVqVX2a/EEBUdU1KrXLf40GoiiFXK///qpoiDXrOgqDR38JB0bw7SoL+ZB9o1RCkQjQ2CBYZKd/+VJxZRRZlqSkKiws0WFxUyCwsKiMy7hUVFhIaCrNQsKkTIsLivwKKigsj8XYlwt/WKi2N4d//uQRCSAAjURNIHpMZBGYiaQPSYyAAABLAAAAAAAACWAAAAApUF/Mg+0aohSIRobBAsMlO//Kk4soosy1JSFRYWaLC4qZBYWFRGZdwqKiwkNBVmoWFSJkWFxX4FFRQWR+LsS4W/rFRb//////////////////////////// /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////VEFHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAU291bmRib3kuZGUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMjAwNGh0dHA6Ly93d3cuc291bmRib3kuZGUAAAAAAAAAACU="),
-harpsichord: loadBase64Sound("data:audio/wav;base64,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tr3CvbWxsbGrqKain5iLio6QjYiBe29lWlNPT0lDPj4/QUNGTVNcXFxfZ2pwcXmBioqOkpiaoaars7m5s66urqyopqSin5WLjZKSjoiFe29lXVZTUk1EQUFDRUZJUFhcXF1gZ2xwc3uDiIqNkpeaoaastLu2r66urquoqKikn5KQlZiXko2Ie3RnYFhYU01FRUVFRkhLUFhYWFpgZGlpb3d+gYOIjpCYnKKns7Wuq6urqKikpKSknJKSl5qXko6Ge3FnYFxaVk1ISEhIS0tQVlhYWF1gZ2lqcXuAgIOKjZKYnaKss7Osq6urq6moqKikmJSYnJyYlJCFe29nYF9aU0tISEhJS01SWFhYWF1gZmZqcXl9fYGIipKVnKKssaypqamoqKSkpKSclZSYmpqVlIuBdm5kYF9aUktJSElLS1BVWFhYWl9kZmdudn1+gIWKjZWYn6evr6ypq6moqKamqKSalJecnpqXk4qAdGxmYmBYUE1LS0tLTVJYWFhYXF1iYmdudHl5foOFi5CVnKarqaaopqSkpKKkpp+VlZienpqYkot+dmxpZmRaVVJPUFBPU1pdXFxcX2RmZmpxd3l7foOFi5CUnaaopqSkpKSioaKkopyVl5yenpyYkoh+c25qaWJaVlNSUlJSVlxdXFxcX2JiZGpxc3R3fX2FiIuSnKKin5+fnp6enqGkn5iVmJ6enp6YkoZ+dHBubGRdWlhYVlVWXV9fX19fYmJkZm5zc3Z7fX6FiIuVnKGfnp6enp6enqGinJWVmp6hn5yYkIV7dHFwaWJdWlhYVVVaXV9dXFxdYF9iZWxwcHR3eX6BhYuTnJ6cnJyanJ6an6KinJeYn6GhoZ6YjoZ7dnNzamRfXVxcWFhdYmJfX19iYmJiam5wcHR2eX6BhY6VnpyampqanJqcn6Kfl5ecnqGhn5yTi4J3dHNuZ2BdXFxYVlpdX19dXF9fX19iamxucXR2e36DhpCYmpqampqcnJqeoqKcl5ieoaSioZqSiH55dnRuZ2JfX1xaWl1iYmJfX2BiYGBnbGxuc3N3e4CBiJKamJeXl5eal5ieoZ+VlZqeoaGhn5iQhX55dnFsZ2JfX11cXWBiZGBfYmJiX2JpbGxuc3R2e36BipOXlZeVlJeXl5ien5qUlZqeoaGhnZWNg315d3NuaWZkYl9fZGZpZWJiYmRiYmdqbGxwcHN2e32BipKUlJSQkJSUkpecnJSQlZieoaGhmpWIgX19d3RsaWZmYmBiZmlpZmZmZmZiZmpsbHBwcXN3eX2DjZCQkJCQkJKQlJial5KSl5yeoaGfmJKIgX17d3NuamlnZGJmZ2xqZmZmZmRiZ2ppbGxwcHR2eXuFjY6QkI2NkI6OkpqalJCVl5yfoaGfmI6IgIB9eXNwbGlnZGZnbGxpZmZmZGJiZ2lpbGxwcHN2dnyIi42NjY2NjY2OlZqYlJSVmJ+ipKKfl46Fg4F+eXNwbGxnZmdqbGppZ2ZmYmBkZmdpaWxsbnNzdn6HioqNiouNi4uQmJiVlJSXnJ+kpKKflYuHg4F+d3RwcGxpaWlucGppaWlmYmJmaWlpbGxscHNzd4GHioqKiouLiouSl5WSkJSYnKGipKGYkoiFg4B8dnRwbmppaWxwbmxpaWlnYmRpaWlsbGxucXN0fIOIioqKioqKio2UlZKQkJWYnKGioZ+XjYeFg355dnNzbmxpanBwcGxsamlmZGdpaWlsbGxwcXB0foGHh4eHh4eHh46SkpCNkJSXnp+hoZyTioeDg357dnZzcGxscXNzcHBsbGpmZ2lsbGxsbG5xcHF3foOHh4eHh4eDho6QkI2NkJSYnqGhn5iQioeHgX55dnZzcGxuc3NzcHBwbGdmaWlpamxsbG5wcHF7foODg4ODg4OBiI6QjYqNkJWanqGhn5eNiIeHgX55eXZ0cXBzdnZ0cXBwbGdpamxqbGxsbHBubnN7foGDg4ODg4CBiI6Oi4qOkpecn6GhnJOLioiHg359e3l0cXF2dnZ0cHBwamZpamlpamlpbGxsbnR7foCAgICAgH2Fio2NioqOkpicoaKhnJKLioqHg359fXl0c3Z5eXl0c3NwamlsbGxsbGlsbGxscXZ7foCAgICAfX6Fi42KiouOk5icn6Gel46KioeFfn19eXdzc3Z5eXdzc3FuaWpsbGxsbGxsbGxudHd+gICAgIB+fYGIjYuKio2OlZqeoaGckouKh4eDgH19e3ZzdHl5eXZ2dnFsaWxsbGxsbGxwbGxxdHt+gICAgIB9fYGKioqHiouQlZqeoZ6VjoqIh4WAfX19d3Rzdnl7d3Z2dHFsbGxubG5sbG5ubG5xd3t+gH5+gH57fYOKioeHio2Sl5qfoZyVjoqKiIWAgIB9eXZ3e319d3d5dnBsbnBsbm5sbG5sbG5xd3t9fX19fXl3e4OHh4OHh4uSlZqenpiSi4qKh4OAgIB9eXZ5fYB9eXl5dHFwcHBwcHBscHBsbHB0eX19fX19e3d3foWHhYOHiI6Sl5yenJWOioqIhYOAgIB9eXl7gIB9fX13dHFwcXBwcG5scGxsbHB0d3t7eXl7d3R3gIODg4OFio6UmJ6emJSLioqKhYOAg4B9eXuAg4B9fX13dHBzcXBwcGxwcGxsbnF2e315eXt5dHR5gYODg4OFi46UmJ6cl5CKioqIg4OBg4B7eXyAgX59fXt3cXFzcHBwbmxwbGxsbnN3e3l5e313c3d+gYODg4OIi5CVnJ6alY2KioqHg4CDgX55eX6DgH59fnt2c3Nzc3NxcHBwbmxscXR5fXl5fXt2c3l+g4ODgYWIjZKYnJyYkIqKiIeDgYCDgHt5e4CBgH19fXl0c3Nzc3NwcHBwbGxuc3d7e3l7fXdzdHuBg4GAgYeLjpKYnJqTjYqKiIeDgIODgHt5foODgICAfndzc3Nzc3NwcHBubGxwc3d5eXl5eXRzdHuAgICAgYWKjZKYmpiOioeHh4OBgYODfn1+gYODgYODfnd2dnZ2dnNxc3FwbG5xdHl5eXl5d3Nzd3yAgH5+gYWKjpWYmpONiIeHh4GAg4OBfX2AhYWDg4OBfHl2dnZ2dnNzc3NwcHBzd3l5d3l5dHFxd31+fX1+gYeIjpSXl46Kh4eFg4CAg4OAfX2Bh4WDg4WBe3l2dnZ2c3Nzc3FwcHF0eXl5eXl3dHB0e36AfX2AhYeLkpWalY6Ih4eHg4CBg4N+fX6Fh4ODg4N+eXd2dnZ0c3NzcW5sbnF0d3Z2eXl0cXF0e359fX6BhYiOkpiako6KiIeHg4ODh4N+foGHh4ODh4N+eXd2eXdzc3NzcHBwcHN3eXZ3eXd0cHF3e319fX6BhYiOlZiVjouIh4eFgYGDg4F9foGHhYOFhYF9eXZ2eXZzc3NzcHBwcXR5d3Z5eXdxcHR3fX19fX6DhYqOlZeSjYiHh4eDgIOFg4B+gYeHhYWHh4B+enp6end3d3d0c3JydHh6eHh6enZycnZ6fn56foCBh4mRlJSNiIeFhYGAgIODgX5+gYaGg4SGhIB8e3t7e3h4eHh1c3J0dnt7e3t7eXVzdHh8fnx7foCBhouQlJCLh4SGhIGAgYSDf36AhIaGhIaGg4B8e35+e3h4eHd2dHN2ent7e3t7eXR0dnp9fXt7f3+ChouOkIyHhIKCgYCAgYKBf3+BhoaEhoiEgn99fX99e3t7enl3d3V4fHx8fH18eHV2eH1/fXx9f4CChouPjYqFgoKCgICAgoKBf3+ChYWFhoaDgX9/f398fHx8enl4dXh6fHx6fHx7d3Z3eXx8fHx9f4GDiIyOi4iFgoKCgYCBhYOAgIGFhYWGh4aDgH9/f398fHx6enh4dnh7fHt7fHx5d3d4enx8fHx/f4GDh4uLiYWDgoKCgICDhIGAgIKEhISGhoSDf39/f359fX17enl3eHp9fHt8fXx4dnh4fH19fX1/gIGFiIqJh4SCgoKAf4CCgoB/gYOEhIWGhoSBf39/f399fX19fHt6e319fX1/fnx5eHh8fX19fX5/gIGEh4iHhIKAgIB/f3+CgX9/gIOEg4ODg4KAgICAgH9+fn59fHt7fX9/fn+Af3x6eXt9fn5+foCAgIKFh4eFgoGBgICAgIGBgICAgYODg4OEg4GAgICAgH5+fn59fXx8fX5+fn+AfXx6enx+fn5+foCAgIKFhoWDgYCAgICAgIGAgICAgoODg4SEg4GAgICAgICAfn59fHx9fn9+f4B/fnt7e35/f39/f4CAgYOEhYOCgYCAgICAgIGAgICAgoKCgoODgYCAgICAgICAf39+fX1/f39/gIB/fXx8fX5/fn5+f4CAgIOEhIOBgICAgICAgIGAgICBgoKCg4ODgYCAgICAgICAgH9/f39/f39/gH9/fn19fn9/f39/f4CAgYKDg4GAgICAgICAgYCAgICBgYGBgoKBgICAgICAgICAgH9/f3+AgICAgIB/fn5+f39/f3+AgICAgYKCgoCAgICAgICAgICAgICAgYGBgYGBgICAgICAgICAgICAgICAgICAgICAf3+AgICAgICAgICAgYGBgYCAgICAgICAgICAgICAgYGBgYGAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA=="),
-flute: loadBase64Sound("data:audio/wav;base64,UklGRiQIAABXQVZFZm10IBAAAAABAAEAi0UAAO5WAAABAAgAZGF0YQAIAACBgYGBgYGAgICAgICAgICAgICAgH9+fn5+fn5+fn5+fn9/f4CAgICAgICBgoKDg4ODg4ODg4ODg4OCgoKBgYCAgH9/fn59fXx8fHt7e3t7fHx8fXx9fn5/gICBgYKDhISFhYaGhoaGh4eHhoWFhIOCgYCAf359fXx7enp5eHd3d3d4eHl5ent8fX5/gIGCg4SFh4iIiYqKioqKiomJiIeGhYSDgYCAfn17enl4d3Z1dXV1dXV1dnd4eXp7fH5/gIKDhYaIiYqLjIyNjY2MjI2Mi4mIhoWDgYB/fXt6eHd1dHNzcnFxcXFyc3R1d3h6fH6AgYOFh4mLjI6Pj5CRkZGQj4+PjYuJh4WDgYB9e3h2dHJxb25tbWtrbGxub3FydHd5e36Ag4aIi42PkZSVlpeXl5eWlZSTkY+MiYaDgH57eHRxb21raWdnZmZlZmdoam1vcnV4e3+ChYmMj5KVl5qcnZ6enp2cmpiWlJGOioeCf3t4dHBsaWZkYmFgX19fYGJkZmlscHR4fICEiIyQlJebnaCjpKWlpKOhn52al5OPioaBfXl0cGtnY2BdXFpZWVlaWl1fYmZqbnR4foKHjJGVmp6hpKerrKysq6qopaKemZWQioWAenVvamVfXFhVU1JRUVJTVFdaXmNobnN5f4SLkZedoqaqrbCytLS0srCuqqahm5aQiYN9d3BpY15YVFBNS0lJSUpMT1BVWmBmbXR7gYiPl56kqa6ytbi6vLy7ubezrqmjnZaQiIF5cWliXFZQS0hEQkFBQkNGSU5TWWBnbnV9hI2UnKKprrO3u72/v7+9u7izrqminJSNhX51bmdgWVNOSkZDQkFBQkRHS1BWXGJpcXiBiJCXnqWrsLW5vL6/v769uraxrKagmZGKgXpya2RdV1FMSEVCQUFBQ0ZJTVJYXmVsdHyEi5Oaoaets7e6vb+/v767uLSvqqSdlo6Gf3dvaGFaVE9KR0RCQUFCREdLT1RaYWhweH+HjpadpKqwtbi8vr+/vr26t7Ktp6GZkouDfHRsZV5XUk1JRUNBQUFDRUhMUVddZGxze4KKkZmgp62ytrq9vr+/vry5tbCrpZ6Xj4iAeHFpYltVUEtHREJBQUJDRkpOU1pgZ292foWNlJyjqa+0uLu9v7+/vbu3s66oopuUjIR9dW1mX1lTTklGQ0FBQUJESEtQVlxjanJ5gYiRmJ+mrLG1uby+v7++vLm2saymn5iRiYF6cmpjXFZRTEhEQkFBQUNGSU5TWV9mbXV8hIyUm6KorrO3u72/v7++u7i0r6mjnJWOhn52b2dgWlRPSkZDQkFBQkRHS1BVW2JpcHiAiI+XnqSqsLW5vL6/v769urayraegmZKKgntzbGReV1FMSEVDQUFBQ0VJTVJXXmRsdHyDi5KZoKetsre6vb6/v768uLWwqqSelo6Hf3hwaWJbVE9LR0RCQUFCREdKT1RaYGhvd3+GjpWcpKqvtLi7vr+/v726t7OuqKKak4uEfHVtZl5YUk1JRkNBQUFCRUhMUVZdZGtyeoGJkZigpqyxtrm8vr+/vry5tbGspZ6XkIiBeXJpYlxWUEtIREJBQUJDRklOU1lgZ251fYSMlJyiqa6zt7u9v7+/vbu4tK6popyUjYV+dW5nYFlTTkpGQ0JBQUJER0tQVlxiaXF4gIiQl56lq7C1uby+v7++vbq2saymoJmRioJ6cmtkXVdRTEhFQkFBQUNFSU1SWF5lbHR8hIuTmqGnrbK3ur2/v7++vLi0r6qknZaOhn93b2hhWlRPSkdEQkFBQkRHS09UWmFob3h/h46WnaSqsLW4vL6/v7+9ureyraehmpKLg3x0bWZfWFNOSkdEQ0JDREdKTlJYXmVtdHuCiZCXnqWrr7S3uru8vLu5trKuqaOdlo6HgHlya2ReWFNPS0hGRUVGR0pNUlZcYmlwd36FjJOaoaasr7O2uLm6ubi2sq+qpZ+YkouEfnZwaWJdWFNPTEpISEhJS05RVVtgZ210eoCHjpWcoqerrrK0tre3trSyr6umoZuVjoiBe3RtaGJdWFRQTkxLSktMT1FVWl9kanB3fYOKkZedoqerr7GztLS0s7Gvq6einZeRi4V/eHJsZmFcWFVRT05NTU5PUlVZXmJobXN6gIaMkpidoqerrq+xsrKxsK6rp6OemZSOiIF8dnBqZWFdWFVTUVBQUFFTVlldYWZrcXZ9goiOk5meoqaqra+ur6+uraqnpJ+blpGKhYB6dG9qZV9cWFVTUlFRUlNVWVxgZGludHp/hImPlJmdoaWoqqurq6upqKajn5uXkYyHgn55dG9qZWJgXVtZWFdYWFpcYGNmam9zeH2AhYqOk5eanaCipKWmpaSjoZ+cmZaRjYmEgH14dHBsaWVkYmBfXl5fX2FjZWlscHN3e3+ChoqNkJOWmJqcnZ6enJybmZeVko+MiYWCf3x4dXJvbWtpamhoZ2doaWpsbXFzdXh7fYCDhoiKjY+RkpSVlpaWlpSTkpCOjIqIhYOAf3x6eHZ0c3FwcHBvb29wcXFzdHZ4ent9f4GChIaIiYqLjI2Njo6OjoyLiomIh4aEg4GAf318e3l4d3Z2dXZ2dnZ2d3h4eXp8fX5/gIGCg4SFhYWGh4eHh4eHh4aFhYSEg4KBgYCAf39+fn19fHx8e319fX19fX1+fn5/gICAgICAgYGBgYGBgYGBgYGBgYGAgICAgICAgICAgICAgICAgICAgA=="),
-boing: loadBase64Sound("data:audio/wav;base64,UklGRjQeAABXQVZFZm10IBAAAAABAAEAjEUAAO9WAAABAAgAZGF0YRAeAACAgICAgICAgICAgICAgICAgICAgICAgYOIkKK9cT84OjhYeoiqs6+rqot4cF5FR1BKUnJ/iaOvp6enjndvYkxOV1logouTpq6mnpqFcmpgU1RlZ3KDkJCVk3VYRm/O1N7TnXxSOyQzNkZ0laS10868tZx7X1c8NEhXZX+mrr3JvKiXhV5PSEBAUmZ0k6awsrerlYNyXEtKSE1gdISVqKuqp5iDdWdVTVRYY3SGk6OutLS8rVMoJhkrUnOLs77Aw7+aiXpdQkVEQVJueIyosrC1sJuBel1KS01PXHuFlqiyq6eji3xvYU9PWl5vgIuOm5Z6YVGVys7LwYBsSi0uPD9RiaCsvtPFtK6Ja1xRNzdUXHGRq7G+ybWckHlbTkk+Rlxvfpitr7S0o41/aVFLTEtVan2LoKqqqaSQe29fUVBVXGl+jpmnsa2ssqRbKyAbKFFxia/EwsfJnot2YT07PTlNaX2LrLq0t7GcfXRYRUVLTFt7i5uutrGpood0Z1tMTVlfcIKNlJ6Zel5mr8bGwqtyXUUqNUlNY5GkrMDGs6effl5ZTz9HXml8nq2wu76jkYNrU09MRVJreYehrqyuqJKAdV9NT1NVY3mIkqWpop+Xg3NpW1RXXWZxh5Gdp6qnoqaacTQgHyVObY+ux8fKx6CJc189Ojw8UGiAjq68t7ewnH1xV0NBSFBffo+grrmzqaKGdWNZTEtWX22Cj5admIJkbbC7v7ScdVlKMz9QWnKYpqy7vaibknZcV1BIUWhzhKCrrLSxmoh6ZFNRTk5fdYKQoqmmpaCHe2tfUFNaXnCAjZWjpZyYjH1tZ1pXXmdwe42TnaOhnZiWk3lDKiYrT2qPrMbJycSjinBdPzs+QVJpg5Kvu7i1rpiAbFlEQ0lSYHyQobC2sqmeiXNiV01MWGJzhJOZnpiCaXCqtritlnNbTDpGV2J4m6eruLeimIxzW1hSTlhseISiqqquqpiBe2FUUlRVYXiBk6GnpKGbg3ZpXVFVXmN2g5CWoqKWk4Z7amRbWmFqdYCPlZyhnJaSjo6DTzcuMUtjg6G6w8XArY93YU0/QUROZXyPo7a3s6ubgm9cS0NKU2B3jZ2qs7GonYx3ZlpSUFljcoKQmZuYhG5wo7W1q5Z0XE49QFZgeZSprba5opaJeFpYUk1ZanuHoaysraiWgHhfU1JVVmN7hJSjqaWgl4J1Z1pSVl9leIaTmaKilZCDeGhiXFtha3OAjpecoJ2UjYmHiWhENjhEXn6Ys8HBu6+Ue2dUQkJIUWJ7jZ6uuLKqnYhxYVFISlRhdYqaprCwp5uNemtcVVBUYmx/i5ealYtxa5uxtK6ae19RQUFXX3eOp6m0uKeai3xfWlRQV2h4hJ6pq6yomYN7YlZTVldheIGRoKekoZqIeGteVlddZHKDjpegoZqSiHtuZV9aYGhxfY2Vm5+clY6Hg4R1Uz89QlZzj6e6v7qwn4FtWktDRk5bcYaXprGxrKCSd2pZTklQX2qCkaGprqudk4BxYlpTVV9qeISSlpWOd22UsLawoIZmVkQ+UFlvhKKptLmtoJGEZltVTlFgcX+TpquurqCOgG1cVFRSXG19ipqkp6Wfj31wYldUWV1sfYqTn6OfmI6AcWhfWlxja3iHkpmfnZiRioOBf2FHQEBLYoSVsbu7taeSdmhTSEhNV2N/i5+qsKujmX9wYFVMTVtkeoiZoauroZeIemhhVlReZnN9jJKTkHtvi621sKWOcFtLQUtXZn6Zpa24sqKWh3BeV1BPXGx6jqGoqq2kkoNzYFZVU1hpeIWWoaSkoZOCdWhZVVldaXqHkJqhnpqRhHhsZFxcZGl2g4+XnJ6alIyFgIdzVUA/QVV5jKm6vbuxoH5xXE1ESVFadYWYprSyp6GLemVaS0pVXXCAlp6qrqaek4JxZFtUV2BqdoWRlJWMfH+hraefjXNdU0ZOXGp8l6SrsrCgk4VxYFpVVF9xfYyfpqeooI6AdGNYWVldbX2Glp+joZySfnVnXVdbYmp8h5GYnZyUjoB2amVeX2dtfIWSmJublI6HgX+GhmVFPj9Ia4Oet8C/ua2FdV5PQURMVW6ElKSytq2klHppW05HUV1qfpShqbCqoJKCbl9ZUlVhbXuKlpyclIR8kJ2YkYZxYVxVW2x5hpmlpaOfkYJ5bmJfYWVwfImSnaGalo+Ecm1iXWJpcnqKkJOZlo+HgHFqZWRianZ9iZGVlZONgHpybGdpbHB8gYmOkpGOioF9eHl/iZ2EXUpCQlt5kKq6uLOpj3VkVkdIU1tshJSfrLClmYx2ZFtTTlhodYaao6iqoZKFdmZbW11hb32KlZ6elo5+cnmIh4SBfHFwcnJ9gYmNlJGKioF6d3dxcXd6foOKio2NhoKAfXR0dHJ4fYCBiYmFhYN/enl2cXV3eH2BhYaIhYJ/fXh2dnd4en+AgYWDgoKAfXx8fH+DjJaknG9PQTpGZoKgt7y4sJh7Z1VIRU1abYWYo62vopOEb1xRUFFgdISUpKunoZmCdGZdV11pcoSRnaChmYqAcmtrcHV4gIaKjZKPi4h/enZzcnV6f4aLj4yKhn96dnNydXh9g4iLi4mDf3p2cnJzdnqAhomLiYN/enZycHN3fYGGiYqJhYF9eHV1dXh8gIOGiomGg4CAgIOMn6qAUTotNleBpcTNxrSSbVI8MjpPaYKjsry5o490XklFS1V0h5+stK2cjXJiVlJZZn+NoKmpoZCCbmRcX298iouNkZOSjYZ8dGxrcHN+h5CSlJCEf3NsaGxweYOLkJGMhn12cG5vc3uBh4yMiIR9d3Jycnd9gYaIiISBfXh2dnh7gIaIioeDfnh2dXZ6gIaLjIqGg4KChJKrnlw/KitQerDN28qniEsxJytPcqG3ysWjiWFIOj9VcJiqubmji21bS05kdZOlsKyejHFhVFRldo6eqaibjXZnW1dgcoibp6qdinVjWFppfI+fpJ+PfWlbWWFzhZWfnJKBcWVgZXB/jpeYkYN1amVoc4CMk5KMgHVraW13hI6Tko2Ad29rcXeEipGRiIB0b290gomSlpaTmZpnQi8xWIbF2de6eE8mJThhn8DWyJhxQC41ToKjwsSoil1IQE11kLG7sZp6XU9SZoScrKubgWpcXGl+lKKdkoV2amVteomWmpWIeW1nbXiFkpeShXltZ2t1hI2SjYR6cW9zeoOIiYR9d3Nzd3+FiYiBfHZzdHl/g4eGgX96eXp9gIKCgn99fHx/f4KCgIB/f3+AgoWFh4yUhmRNTmmHuMCojV1CP1WBmrWylnJWS1VxkKaklHtjWV10ipqflYBtY2d0hpSZkoR1bWx2gouQjIN6c3R6gomRlIh7cm90go2SjoR8dHR8hYuLiIJ4c3R7gYaLiH97d3Z7f4OFgX16ent9gYKAf3t6enx/gIB/fHx8fH+AgIB/fHx8fX+AgH9/fHx8f4CAgIB/f3+AgYOGiot7ZGFwgpWmmHxjXWd2ipiTg3JqcHqDiYeAdnN5f4OFgXt3d3yDh4aCe3d4fYOIhoJ8eXh8gYODgHt3dnmImZiIcmxqdI+cl4h0cHR+kJSMf3JweoKMkId+dHR8gomIgXt2d36DhYN9enh5f4KCgHx6enx/gIB/fHp8f4CAf318fH1/gH99e3p8f4GCgX99fHx/gIKCg4WKhXFmcH+MmJSAa2Ftf42Ri31va3SCi4yEe3RzeoKIhn95eHl+g4eDf3p6fYGFhYF9enp9gIKBfXp4eHp7hZWUhG1qb3qUnpGAbm56hJKShXpydoKIi4h8d3d8h4qGgHl4e3+GhoB8enp9gYKBfXp7fX+Bf317enx/gYB+e3p7fYCAgH17e3x9gICAf3x8fX+AgICAgIGDhoh7bG15h5OVhnJkanuKko9/dGxygIiLhnp1dXqEiIV/eXd6f4WFgX17fH+ChIJ+fHt9gIKAf3t6e3t9fYSRlYhvaGx4lJ2TgW9ueoWUkoJ2cnaAio6IfHV2foWIhn95eH2DhYR/enl8gIODf3x5fH+Bgn99e3t+gIKAfnx7fX+AgH9+fX1+f4B/f359f3+AgIB/f4CAgoOGhHVscXyMlpCAa2ZxfY6Th3xubnmCjYuAeXN1foWIhHx4eHyDhoWBfHl8f4SEgX97e36AgoF+fHp6e3yBkJqQeGRicIugn4x2Zml7j5mQgXJtd4WPj4V6c3R9iIyHfnd1eoGHh4F7d3h+goaCfnp5e3+Bgn98ent+f4CAfnt7fH6AgH9+e3t9f4CAf359fX9/gICAf39/g4SAd3J1gIqSjH1zbXF/iI6KfndxdH6Giol+eXV4foSIhn98eXp9g4WFgX57e36BgoKAfXt7fH5/fXp4fIucmoRqWl13laamj3JhYXOLnZ6Qe2tmdIaUmI5+cWx0gYySi391b3J9hoyLgHlyc3uCiYmCfHRzeX6FhoN+eHd6foOEg397eXp8gIODgX58e3x/gYSCgH59fX+BgoJ+e3t+goWFg3x6eXp+goSEgH17e31/goKBf359fX5/goKBf399fX+AgICAf399fX1+fn18enh2dXuKoaWUeV5QWnSTra+ghWlZXGuHmaWfiXlmY3B8kJiVjHxybG97hIyOh4F3c3N3f4OIh4N+eHZ4en+ChISBfnp4eXx/gYSCf357ent9gIKCgn9+fHt9f4CCgYB/fnx9foCCgoF/fnt7e36Ag4SDgX58e3t+gIOEg4F+fHt8foCCgoGAf399fX5/f3+AgH9/fHp6eXh4dnZ4iJ6tqpF4VUlMXoegub2pkWtXSVBsg6OwsKOHclpUXGmElqWmmIhwYlpebn2Rmp2WhXhnYmRrfIaSlpKKfXFpZ2x2gYuQkYuCd29tbnR9hIuNi4R+eHNzdXl+hIaFf36DhoaEf3p1c3V5foSKi4qFgHl1dHV5f4SHiYaDf3x5eHp6foGEhYWEgH97enp8fH1/fn18d3Vzc4KXqq2ikXBdTU1fcpCks7OnlnlnWFZcaYGQo6iknIh4ZV5aYXJ/jZuenJKEdWhhYGdzgI2WmZaNgHVrZWVsdYCKkpSSioF4b2pqcHiAiY6Sj4qCenRwcHR4foOIiYaCgYOEgoB9eXd2d3x+hIaJiYaEf3x5eHh6fH+ChIWFhIN/fnt5eHl8foGDhIWEgn98eHV0c3R1d3uDkqappJh+bVhRVF50hJumrKqgkH9tYVpcZHKCkZ2jo5yQgXNmX19jbnyJlZudmI6CdmpkZGdueYOOlJaUjoR7cWpmaG53gIiPk5KPh352b2trbXR6g4qQkZCLg352dHFxcnR6foaLjpCMiIF8dXBwcXZ6goaLjYyKhIB5dnRzdHh8f4aHioqHhH57eHV1dnl7foGCgn98fIKMk5SPhXpwaGZpcHqEj5SXlZCIf3dwbGxvdX2FjJGSkYyGf3dxbW5xdn2Ei4+RjomCfXdzcHBzeH2EiY2NjIiBfXh0cnN2eX+DiYuMioaDfHl1dHZ4fYGGiYyNjIuCeW1pZWhze4iQl5qWkIN9cGtnaG1zf4aPlJWTjIR8dW9sbHB1foSMkJKQi4R/eHNwb3J3fYKGioqJiYuKhn96c29ucXZ+hIuPkY6Jg312cnFxdXp/hYmNjYqFgH12c3JzdnuAhYqLioeCf3h2cnR2eoCCh4iJh4KAe3h2dnd6f4CEhoaGhIB/e3l3eXp9gISGiIiHhoWGg3xuZ2NkbnqHk5qdmpCFeG1kYmRrdYKMk5iWkYh+c2toZ210foiQlZWSi4J6c25tb3R8hIqPkY+KhIB9eXZ1dnl+goiLjo2KhX96dXR1d36Bh4uMi4eDfXh1c3V3foCHiYuJhYB7eHV1dnh/gIWHiIaEgHt5dnZ5eoCChoeHhoKAe3p4eHt9gIKFhoWEgH98e3t+gISIjY+GeGtkYWh1gpCZnZmRg3drY2NocX2HkJWWkYd9c2tpanB6g4yTlJGKgnpybm9ze4CKjpCPioR9eXV1dXZ7gIeNkZGMhnx2cG9yeIGHjpCOioF7dHFxdHuAiI2Oi4R/eHRyc3l+hIiKioaBe3dzc3d7gYaJioeCfnl2dXZ7f4SIiYeDf3x4d3d6foKFiIaFgH17e3x/hIuQjn5waGRndIORmpyWjHtvZWJncn+MlZaSiYBybGhpdH2Ij5ORiYJ3cW5ud36HjZCPiIJ5dXN1e4CGh4aFg4KAgH19fX2AgIOEg4KAf318fX6AgIODgYB+fXt7fH6AgIGBgIB9fXt9fYCAgICAf359fX1/gICAgIB/fn5+gICAgYGAgH9+fn5/gICBgYGAgH9+f4CAgoSGiImBdnBsbXiCkJaWkIJ3aWVqcYKMlJWNhHZuaWt1foqQkY6Ce3FvcXaBiI6PiYR7dXNzeoCGioqHgn9+fn19fn+Ag4SFhIKAfXx8fYCChISEgoB9fX1+gIGCg4KAf319fn+AgYGAgH59fX1/gIGBgYB/fXx8fX+AgYGBgIB+fX1+f4CAgICAgH5+foCAgICAgICAgICAgYOEg355dnZ6f4aLi4iAe3NydXqCiIyLhX93dHR3foKIi4eCfXh1dnx/hYiIhYB8eXh5fICDhIJ/fH2Bh4qIgnt0cXR8hIyQjod+dnJzeoGJjo6JgXp1c3d+hImMiYN9d3R2eoCFiIiEf3t3d3p+goWGhIB9eHh6fICDhYSCf3t5eXt/gISEg4B9fHt7fYCDhIOCgH59fX6AgoODgH17e3yAgoSFg4B9e3l6fYCDhYSDgH17e3t9gIOEhIKAfXx7fH6AgoSDgX99e3t8fX+AgICAhoyNioJ4cG1weoSOlJOMgndwbnN8hY+SkYl/d3FxdXuGi4+Nhn93cnJ2foKJi4mFfnl1dXh8goeJiIJ/eHZ2eH2AhYeFg397eHd6fICEhoWDgHx7ent9gIOEhIOAf3x8fH1/gIKDg4OAgH18fH1+gIKDg4KAgH18fH1/gIKDg4KAf318fH1/gIGCgYB/fXx8fHx9fX1+gYaOkI2GfHJsa298hZGWlJCDe3Btb3R/h5GTkYuAenFvcneBho2QjId+eXJydHmAhouMiYV+eXRzdXmAhYiLh4V+enV1d3qAg4eIh4OAe3l4eHt+g4aHhoSBfnt5eXt9gIGCg4SFhIKAfnt5eXt+gIOFhoWDgHx6eXl7foCDhYWDgX98enp7fYCBgoOCgX99enl5eXt8f4CIj5GRioN3cGlqcXmFjpWXkoyAeXBtb3N8goyQkY+IgXlzcHB0eoGGjY6LiIB7dHFxdHuAhYmLioaBfHd0dHZ6f4OIiYiGgn96d3d3e3+BhIeIhoKAfXt5eXt+gIKDhIOBfXx+gIKDhIKAf3x8fHx+gIGDhISDgYB+fXx8fX+AgYKDg4KAgH99fX19fn+AgICAfn18enx+hYuPj4yHfXZwbnB0fIKLjpGQi4Z/eXNycnV7gIeLjY2LhoF8d3NzdHh+goaJi4mGgX56dXV1eHyAg4aIh4WCf3x5dnZ4e36BhIaHhoSBf3x6eXl7fYCChYaGhYOAfnx6ent8f4CBg4SEhIOBgH59fHx8fX+AgoOEg4KBgH59fX19fn+AgYKCgoGAgH9+fn19fX5/f4CAgIOGiYmHhX98d3V1dnp/g4eKi4qHg397eHZ2eHt/goaIiYiGgn97eXd3eHt/gYSGiIaEgX98eXh4eXt+gYOFhoWDgX98enl5ent+gIKEhYWDgX99e3p6e31/gYOFhYWDgYCAgH17eHh3eH2AhYeKioiFgH55d3Z2eHuAgoWHiIeEgn58eXh4eXx+gYSGh4aFg4B9e3p6e31/gIOFhoaFg4F+fHt6e3x+gYOEhoWEg4B/fHt7e31/gIKEhYSDgX99fHt7fH5/gYKEhIOBgH59e3t8fH6AgYKDg4GAf359fH19fn+AgYKCgYGAf35+fX5+f4CBgoKDgoKCg4OAfXh2dXV6foOHiouJh4F+eXZ1dXd8f4OHiIiGg398eXd3eXx/goWGh4aEgX99e3t8foGDg4KAgICAgIGCgYGAgH9/f4CAgIGBgYGAgIB/f39/gICAgICAgICAf39/f4CAgICAgICAgH9/f39/gICAgYGAgIB/f39/f4CAgIGBgYCAgH9/f39/gICBgYGBgICAgICAgoSFhH96d3V1eH2BhomLiYWBfHd0dHd7f4SHiYiEgXx4d3d5fYCDh4iHhIF+fHp6fX+DhYeGg4F9e3p7fX+DhYeHhIJ+fHl5fH6Bg4aGhIJ/fXp6e32AgoSFg4J/fXp6e32AgoSFg4J/fnt7e32AgYOEg4KAfnx8fH6AgYKDgoKAf319fX+AgYKCgoB/f35+f4CAgoKCgoKCgoJ/e3h3eHt/hIeJiIWBfHd1dnp/g4aIhoN/end3eX2BhIaGhIJ+fHp6fH+ChYaFg4F/fX19fn5/gYSFhYSBf3x7fH2AgoWFhIJ/fHt8fX+ChIWDgX98fHx9gIGDg4KAfn18fX+AgYKCgH9+fX1+f4GCgoKAf319fX+AgYKCgYB/fn5+f4CCgoKAf39+f3+AgYKCgYCAgICBgH99fHx+gIOFhYSBfnt6en1/g4SEg399enp7foGDhISBf317fH2AgoSEgoB/fX19f4CCgoKCgoB/fn5+f4GDg4OBf35+fn+AgoOCgX9/fn5/gIGCgoGAfn5+f4CBgYGBgH9+fn+AgIGBgICAf39/gICBgICAgH9/gICAgYCAgIB/gICAgIGAgICAgICAgICBgICAgICAgIGAgH9+foCAgYKCgYB+fn5+gIGCgoGAf35+foCBgYKBgIB+fn6AgIGBgYCAf35/f4CAgYGDg4GAf3x8fH+ChIWEgX98fHx/gYSFhIF/fX1+f4GDg4KAf359fn+BgoOCgH9+fX5/gYGCgYB/fn5+f4CBgYGAf39/f4CAgYGBgIB/f3+AgIGBgYCAf3+AgICBgYGAgICAgICAgYCAgH9/gICAgYGAgH9/f3+AgIGBgICAf3+AgICBgYCAgIB/gICAgICAgIB/f39/gICBgoOCgH99fHx/gYOFhIKAfnx8foCDhISDgX99fX5/gYOEgoF/fX1+f4CCgoKAgH99fX+AgYKCgYB/fn5/gICBgYGAgH9/f3+AgYGBgIB/f39/gICBgYCAgH9/f4CAgIGBgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYKDgoB/fXx8foCChIWEgX99fHx+gIKEhIOBgH19fX6AgYODgoB/fn19foCBgoKCgH9+fn5+gICCgoGAf39/f3+AgIGCgYCAf39/f4CAgYKBgIB/f39/gICAgYGAgIB/f3+AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGCg4KBgH59fH1+gIKEhYSBgH59fX1/gIKDhIOBgH59fX5/gIKDg4KAgH59fX6AgIGCgoGAgH5+fn6AgIGCgoGAgH9+fn+AgICBgYGAgH9/f3+AgICBgYGAgIB/f4CAgICBgYGAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBgoKCgYB/fn19foCAgoODgoGAf35+fn+AgYKDgoKAgH9+fn+AgIGCgoKAgH9/fn9/gICBgYKBgIB/f39/f4CAgYGBgYCAf39/f3+AgIGBgYCAgH9/f3+AgICBgYGAgICAgICAgICBgYCAgICAgICAgICBgYGAgICAgICAgICAgYGBgICAgICAgICAgICBgICAgICAgICAgICBgYGBgIB/f39/gICBgoKBgICAf39/gICAgYGBgYCAgH9/f4CAgIGBgYGAgICAf4CAgICBgYGAgICAgICAgICAgYGAgICAgICAgICAgIGBgICAgICAgICAgICBgICAgICAgICAgYGAgH9/f3+AgIGCgoGBgIB/f39/gICBgYGBgICAf39/gICAgYGBgYCAgICAgICAgIGBgYGBgICAgICAgICAgYGBgYCAgICAgICAgYGBgYCAgICAgICAgIGBgICAgICAgICAgIGBgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGBgYGAgH9/f39/gICBgoKBgIB/f39/gICBgYGBgICAf39/gICBgYGBgICAgICAgICBgYGAgICAgICAgICBgYCAgICAgICAgICBgICAgICAgICAgICAgICAgICAgICAgICAgICA")
-};
-
-built_in_sounds.harpsichord.freq = 218;
-built_in_sounds.flute.freq = 388;
-built_in_sounds.boing.freq = 148;
-
 function perform_system_beep()
 {
 playSnd(built_in_sounds.beep);
@@ -3118,6 +3572,8 @@ playSnd(built_in_sounds.beep);
 // perform_classic_play_command("harpsichord aw b c de de ee fe gw gs gs gs a#w");
 function perform_classic_play_command(first, notes)
 {
+check_audio();
+
 var narray = notes ? String(notes).toUpperCase().split(/\s+/) : []
 narray.unshift(String(first));
 var sndName = narray[0], snd = sim.stack.localWAVs[sndName.toLowerCase()] || built_in_sounds[sndName.toLowerCase()];
@@ -3131,7 +3587,8 @@ if (audio_context.soundStopACTime > audio_context.currentTime) t = (audio_contex
 narray.forEach((n)=>{ rd = n[1] || rd; if (n[0]) snd ? playSnd(snd, n[0], t) : perform_play_note(n[0], 1000*rd*tempo, t); t += snd_duration*1000 || 1000*rd*tempo; });
 sim.sound = snd ? sndName : 'tone';
 audio_context.soundStopACTime = audio_context.currentTime + t/1000;
-setTimeout(()=>{ if (!audio_context.soundStopACTime || audio_context.currentTime >= audio_context.soundStopACTime) sim.sound=''; }, t+10);
+clearTimeout(audio_context.soundStopTimeout);
+audio_context.soundStopTimeout = setTimeout(()=>{ if (!audio_context.soundStopACTime || audio_context.currentTime >= audio_context.soundStopACTime) sim.sound=''; }, t+10);
 }
 
 /*
@@ -3642,6 +4099,7 @@ set(part) { (part.closest('stack-part') || sim.stack).selectedPart = part; },
 
 if (!provided_script)
 wildcard_script.childNodes.forEach((c,i)=>{
+if (c.nodeName!=='DIV') return;
 c.setAttribute('data-prefix', '\t'.repeat(sim.raw.lineinfo[i].indent));
 c.setAttribute('data-suffix', sim.raw.lineinfo[i].error || '');	// the wildcard script might not even have errors because it falls back to JS
 });
@@ -3698,8 +4156,9 @@ linear-gradient(to bottom, #FFFF 50%, #000F 50%);
 background-size: 8px 1px, 8px 1px, 1px 8px, 1px 8px;
 background-position: 0 0, 0 100%, 0 0, 100% 0;
 background-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
-animation: ants-border 0.25s infinite linear;
+animation: ants-border 0.25s infinite 0.1s linear;
 pointer-events: none;
+transform: translate3d(0,0,0);
 }
 :host(:not([visible="true" i])) {
 display: none;
@@ -3710,532 +4169,6 @@ display: none;
 100% { background-position: 8px 0, -8px 100%, 0 -8px, 100% 8px; }
 }
 </style>`);
-
-document.write('<style>' + `
-@font-face {
-/* https://fontsarena.com/sysfont-by-alina-sava/ */
-font-family: 'Chicago';
-src: url('ui-icons/sysfont.woff2') format('woff2');
-font-weight: normal;
-font-style: normal;
-}
-@font-face {
-/* https://fontstruct.com/fontstructions/show/1304775/geneva-9 */
-/* apparently needs to be used as 18px font which affects linespacing */
-font-family: 'GenevaNine';
-src: url('ui-icons/geneva-9-1.ttf');
-font-weight: normal;
-font-style: normal;
-}
-.flex-row { display: flex; flex-direction: row; align-items: baseline; }
-.flex-column { display: flex; flex-direction: column; }
-.flex-expand { flex: 1; flex-basis: auto; }
-` + '</style>');"use strict";
-var oldscroll;
-var modal_dialogs_that_are_visible = [];	// only :not(.static)
-
-function modalresizer(md)
-{
-var size = [window.innerWidth, window.innerHeight], fullscreen = body.classList.contains('fullscreen');
-
-mutableStyle('--overlay-height', window.visualViewport.height + 'px');
-
-/*if (!body.qs('modal-dialog[visible=true]:not(.static)'))
-{
-}
-else*/ if (fullscreen) {
-mutableStyle('--overlay-height', null);
-mutableStyle('--overlay-translate-y', null);
-}
-else if (window.visualViewport /*&& modal_dialogs_that_are_visible.length*/) {
-if (oldscroll)
-{ document.scrollingElement.scrollTop = oldscroll.value; oldscroll = null; }
-
-mutableStyle('--overlay-top', (document.scrollingElement.scrollTop-visualViewport.top) + 'px');
-mutableStyle('--overlay-bottom-size', window.innerHeight-window.visualViewport.height + 'px');
-
-size = [window.visualViewport.width*visualViewport.scale,window.visualViewport.height*visualViewport.scale/*-(fullscreen?0:20)*/];	// height -20 needed for ipad but not for phone...grr
-//console.log(size);
-/*mutableStyle('--overlay-height', size[1] + 'px');
-mutableStyle('--overlay-translate-y', size[1] - (fullscreen ? 0 : window.innerHeight) + 'px');*/
-}
-
-if (modal_dialogs_that_are_visible.length)
-(md ? [md] : Array.from(body.qsa('modal-dialog'))).filter((md)=>md.matches(":not(.static)")).forEach((md)=>{
-var xshrink = Math.min(1, size[0]/(md.shadowRoot.qs('#dialog').offsetWidth+6));
-var yshrink = Math.min(1, size[1]/(md.shadowRoot.qs('#dialog').offsetHeight+6));
-var s = fullscreen ? 1 : Math.min(/*(xshrink < 0.5) ? 1 :*/ xshrink, (yshrink < 0.7) ? 1 : yshrink);
-md.style.setProperty('--scale', (s!=1) ? s : '');
-//md.shadowRoot.qs('#dialog').style.transformOrigin = 'top center';
-md.style.setProperty('--transform', (s!=1) ? 'scale('+s+')' : '');
-});
-
-if (window.stackcontainer)
-{
-window.stackcontainer.scrollTop = 0;
-size = [stackcontainer.offsetWidth -(fullscreen?2:6),
-Math.round(window.innerHeight*visualViewport.scale)
-- (fullscreen ? 0 : stackcontainer.offsetTop)
-- ((false  && !fullscreen && body.classList.contains('messagebox-visible'))?50:0)
-- 3
-+ window.scrollY	// this is to compensate for window.innerHeight shrinking when the ipad keyboard shows
-/*- (fullscreen ? copyright.offsetHeight+10 : 0)*/];
-//console.log(size);
-var stackzoom = 1;
-Array.from(stackcontainer.qsa('modal-dialog')).forEach((md)=>{
-//md.classList.toggle('static', !fullscreen);
-// we need a centering thing for full screen
-var xgrow = size[0]/(md.shadowRoot.qs('#dialog').offsetWidth+1);
-var ygrow = size[1]/(md.shadowRoot.qs('#dialog').offsetHeight+3);
-var s = Math.min(xgrow , ygrow); //console.log(s);
-
-// if we're gonna fill the screen i think the screen needs the same s for everything. but oh well
-/*if (s > 1 && !body.classList.contains('fullscreen') && matchMedia('(pointer:fine)').matches)
-s = 1;*/
-if (s > 1 && matchMedia('(pointer:fine)').matches && !fullscreen)
-s = 1;
-else if (s > 1 && !fullscreen)
-s = Math.floor(s*4)/4;
-
-//	if (s > 1 && (!fullscreen || md.classList.contains('inactive')))
-//		s=1;//s = Math.min(Math.floor(Math.sqrt(s)*8)/8, 1.5);
-
-md.style.setProperty('--scale', (s!=1) ? s : '');
-md.style.setProperty('--transform',
-((!fullscreen ? '' : 'translate(' + Math.floor((size[0]-md.shadowRoot.qs('#dialog').offsetWidth*s)/2) +'px, 0px)'))
-+ ((s!=1) ? ' scale('+s+') ' : ''));
-stackzoom = Math.min(2,s);
-});
-
-/*if (typeof answerdialog != 'undefined' && stackzoom>1)
-answerdialog.style.setProperty('--transform', (stackzoom>1) ? 'scale('+stackzoom+')' : '');
-if (typeof askdialog != 'undefined' && stackzoom>1)
-askdialog.style.setProperty('--transform', (stackzoom>1) ? 'scale('+stackzoom+')' : '');*/
-/*if (window.answerdialog && stackzoom>1)
-answerdialog.style.setProperty('--transform', (stackzoom>1) ? 'scale('+stackzoom+')' : '');
-if (window.askdialog && stackzoom>1)
-askdialog.style.setProperty('--transform', (stackzoom>1) ? 'scale('+stackzoom+')' : '');*/
-
-if (window.stackcontainer_windowmoved)
-stackcontainer_windowmoved();
-}
-}
-window.addEventListener('resize', (event)=>modalresizer());
-window.addEventListener('scroll', (event)=>modalresizer());
-window.addEventListener('orientationchange', (event)=>modalresizer());
-if (window.visualViewport) window.visualViewport.addEventListener('resize', (event)=>modalresizer(), {passive:true});
-if (window.visualViewport) window.visualViewport.addEventListener('scroll', (event)=>modalresizer(), {passive:true});
-
-var ever_waited_on_coarse = false;
-function modal_dialog(element,template)
-{
-var titlebar = template.qs('#titlebar'), dialog = template.qs('#dialog');
-
-new ResizeObserver(entries => requestAnimationFrame(() => { modalresizer(element); })).observe(dialog);
-
-template.qs('#closebox').addEventListener('click', (event)=>{
-element.dispatchEvent(new Event('closebox', { bubbles: true }));
-event.preventDefault(); return event.stopPropagation();
-});
-template.qs('#zoombox').addEventListener('click', (event)=>{
-element.dispatchEvent(new Event('zoombox', { bubbles: true }));
-event.preventDefault(); return event.stopPropagation();
-});
-element.addEventListener('pointerdown', (event)=>{
-if (event.composedPath()[0]===element)
-{ event.preventDefault(); event.stopPropagation(); /*perform_system_beep();*/ return; }	// don't mess with the selection
-});
-titlebar.addEventListener('pointerdown', (event)=>{
-if (!titlebar.contains(event.composedPath()[0]) || event.composedPath()[0].matches('#zoombox,#closebox')/*===template.qs('#closebox')*/) return;
-if (element.matches('body.fullscreen #stackcontainer modal-dialog, modal-dialog.nodrag'))
-{ event.preventDefault(); event.stopPropagation(); return; }
-if (element.matches('#stackcontainer > modal-dialog') && !body.classList.contains('command')) top_stackList(element);
-// when .ybottom, style.bottom moves, not top, so we get the offset from the bottom
-var clickloc = [event.clientX - element.x,
-element.classList.contains('ybottom') ? (element.y - (element.parentNode.getBoundingClientRect().bottom - event.clientY)) : (event.clientY - element.y)]; //console.log(clickloc);
-follow_mouse(event, move,
-(event,start)=>{
-element.classList.toggle('dragging', start);
-if (!start) element.dispatchEvent(new Event('windowmoved', { bubbles: true })); else return true; } );
-function move(event)
-{
-requestAnimationFrame(()=>{
-// reealllly needs to be 'dont escape container'
-element.x = Math.max(event.clientX - clickloc[0], element.classList.contains('positivexy')?0:-999999);
-// if we know the offset from the bottom, and it is as far from the parent as
-element.y = element.classList.contains('ybottom')
-? (element.parentNode.getBoundingClientRect().bottom - event.clientY + clickloc[1])
-: Math.max((event.clientY - clickloc[1]), element.classList.contains('positivexy')?0:-999999);
-element.dispatchEvent(new Event('windowmoved', { bubbles: true }));
-});
-}
-event.preventDefault(); event.stopPropagation();
-},true);
-
-element.tabIndex = 0;
-return {
-set name(value) { template.qs('#titlebar span').dataset.name = value; },
-set x(value) { template.qs('#dialog').style.setProperty('--x',value+'px'); },
-set y(value) { template.qs('#dialog').style.setProperty('--y',value+'px'); },
-get x() { return parseInt(element.getAttribute('x')) || 0; },
-get y() { return parseInt(element.getAttribute('y')) || 0; },
-set visible(value) {
-oldscroll = { value: document.scrollingElement.scrollTop };
-if (matchMedia('(pointer:coarse)').matches	// let keyboard come up before placement, on touchscreens
-&& (element.contains(document.activeElement) && element!==document.activeElement)
-&& !element.classList.contains('static') /*&& !ever_waited_on_coarse*/ && visualViewport.height == window.innerHeight)
-{
-element.style.opacity = '0';
-setTimeout(()=>{ element.style.opacity = ''; }, 600);
-ever_waited_on_coarse = true;
-//console.log(document.activeElement, element.contains(document.activeElement));
-}
-else
-setTimeout(()=>{modalresizer(element);},1);
-
-if (boolean(value) && !element.classList.contains('static')) {
-if (!modal_dialogs_that_are_visible.includes(element))
-modal_dialogs_that_are_visible.push(element);
-if (!matchMedia('(pointer:coarse)').matches)
-element.focus();
-}
-else {
-modal_dialogs_that_are_visible = modal_dialogs_that_are_visible.filter((m)=>(m!==element));
-if (element.contains(ContentEditableFix.ActiveElement()))
-ContentEditableFix.ActiveElement().blur();
-}
-},
-get visible() {
-return !!(element.getAttribute('visible') && element.getAttribute('visible') !='false');
-},
-cardWindowDelegate() {
-if (!element.card_window_delegate) {
-element.card_window_delegate = document.createElement('card-window-delegate');
-element.card_window_delegate.connectToDialog(element);
-}
-return element.card_window_delegate;
-}
-};
-}
-ElementTemplate.Create("modal-dialog", "name,visible,x,y", "",`<div id="dialog"><div id="titlebar"><div class="boxmargin left" style="flex: 0 1 2em;"><div id="closebox"></div></div><div style="background-position: top right;"></div><span id="title" style="position: relative;"></span><span id="flashmessage" style="color: green;"></span><div> </div><div class="boxmargin right" style="flex: 0 1 2em; "><div id="zoombox"></div></div></div><div id="content"><span id="cover" onpointerdown="if (typeof sim != 'undefined') sim.mouse='down';" onpointerup="if (typeof sim != 'undefined') sim.mouse='up';"><div class="answer"><button-part type="standard" visible="false" name="Extrabutton" onclick=""></button-part><button-part class="reload" type="default" name="Reload ↺" onclick="this.getRootNode().host.performUpdateReload(); this.getRootNode().host.classList.remove('loading','offer-update');"></button-part> <button-part type="standard" class="cancel" name="Cancel" onclick="this.getRootNode().host.classList.remove('loading','offer-update');"></button-part> </div></span><slot></slot><!--div style="clear:both;"></div!--></div></div><style>
-
-:host #flashmessage { width: fit-content; font: caption; padding-right: 4px; xtransition: opacity 0.15s; }
-:host #flashmessage:empty { xwidth: 0px; xpadding: 0px; opacity: 0; display: none; }
-
-:host {
-cursor: default;
-font: var(--modal-dialog-font, bold 1em system-ui);
-outline: none;
---x: 0px; --y: 0px; --transform: ;
---dialog-border: #444;
-pointer-events: none;
-position: relative;
-overscroll-behavior: contain;
-}
-:host(.dotted) {
-//font: var(--modal-dialog-font, caption);
-}
-:host(.static) {
-visibility: hidden;
-pointer-events: none;
-font: var(--modal-dialog-font, inherit);
-}
-:host(:not(.static)) {
-position: var(--modal-dialog-modal-absolute, fixed);
-left: 0px; right: 0px; top: var(--overlay-top, 0px); height: min(100%, 100vh);
-z-index: 100;
-box-sizing: border-box; xborder: 10px solid gray;
-display: none;
-}
-:host(:not(.static):not(.dotted)) {
-backdrop-filter: blur(1px);
--webkit-overscroll-behavior: none; overscroll-behavior: none;
-background: #8884;
-pointer-events: auto;
-xtransition: border-bottom 0.1s;
-border-bottom: var(--overlay-bottom-size, 0px) solid transparent;
-}
-@media(prefers-color-scheme: dark) {
-:host(:not(.static):not(.dotted))) { backdrop-filter: none; /* safari issue */ }
-}
-:host([visible]:not([visible="false" i])) {
-display: block;
-visibility: visible;
-}
-:host(:not([visible]:not([visible="false" i]))) #dialog slot {
-display: none;
-}
-
-:host(:not(.loading):not(.inactive):not(.waiting)) #cover
-{ display: none; }
-:host #cover
-{ position: absolute; z-index: 1; left: 0; right: 0; top: 0; bottom: 0; background: #FFF4; display: grid; place-items: center; }
-:host(.waiting) #cover { background: transparent; }
-:host #cover:after
-{ content: " "; }
-:host(:not(.loading):not(.waiting)) #cover > .answer
-{ display: none; }
-
-:host(.loading:not(.offer-update)) #cover { background: white; }
-
-:host(.loading) #cover > .answer {
-background: white; padding: 0.5em 1em; border-radius: 0.5em; border: thin solid gray;
-font: caption; text-align: center; color: gray;
-}
-@keyframes flicker-animation {
-0%   { opacity:0; }
-50%  { opacity:0.3; }
-100% { opacity:0; }
-}
-:host(.loading) #cover .answer:before
-{ content: "Opening..."; opacity: 1;  }
-
-:host(.waiting) #cover  {
-opacity: 1;
-xcursor: url(ui-icons/watch.png) 8 8, default; 	/* would be nice to delay the watch a little while somehow */
-cursor: url(ui-icons/cursor.png) 6 0, default;
-}
-:host(.waiting) #cover > .answer {
-animation: flicker-animation 1s 2s infinite;
-background: white; padding: 0.5em 1em; border-radius: 0.5em;  border-radius: 0.5em; border: thin solid gray;
-font: caption; text-align: center; opacity: 0;
-}
-:host(.waiting) #cover .answer:before
-{ content: "Wait... (⌘ .)"; }	/* should change this to fluid [data-wait-message] or something. = wait 3 seconds, Loading..., etc */
-
-:host(.loading.offer-update) #cover > .answer {
-xbox-shadow: 0px 0px 4px gray;
-}
-:host(.loading.offer-update) #cover .answer:before
-{ content: "This stack was changed."; display: block; font: bold 1em system-ui; color: black; padding-bottom: 0.5em; text-align: left; }
-:host(:not(.offer-update)) #cover .answer button-part
-{ display: none; }
-
-:host #dialog {
-position: relative;
-display: inline-block;
-transform-origin: top left;
-transform: var(--transform);
-pointer-events: var(--context-menu-none, auto);
-}
-/*:host(:not(.dragging):not(.static)) #dialog {
-xtransition: transform 0.1s;
-}
-@media (pointer: fine) {
-:host(:not(.dragging):not(.static)) #dialog {
-transition: transform 0.1s;
-}
-}*/
-:host(.block) #dialog {
-display: block; width: 100%;
-}
-:host(:not(.frameless)) #dialog {
-background: var(--dark-mode-softwhite, white);
-border: thin solid var(--dialog-border);
-xborder-radius: 2px 2px 0px 0px;
-}
-:host(:not(.static)) #dialog {
-position: absolute; left: calc(50% + var(--x)); top: calc(50% + var(--y));
-transform: var(--transform) translate(-50%,-50%) ;
-box-shadow: 0px 0px 3px #444;
-}
-:host(.notcentered:not(.static)) #dialog {
-position: absolute; left: calc(60px + var(--x)); top: calc(60px + var(--y));
-transform: var(--transform);
-box-shadow: 0px 0px 4px #444;
-}
-
-@media (pointer: coarse) {
-:host(:not(.static)) #dialog:focus-within {
-top: calc(0px + var(--y));
-transform: var(--transform) translate(-50%,0%) ;
-}
-}
-:host(.static) #dialog {
-pointer-events: var(--context-menu-none, auto);
-left: var(--override-xy-zero, var(--x)); top: var(--override-xy-zero, var(--y));
-box-shadow: 1px 2px 2px #EEE;
-}
-:host(.current.static) #dialog {
-box-shadow: 1px 1px 6px #CCC;
-}
-:host(.ybottom) #dialog {
-position: absolute;
-top: auto;
-bottom: var(--override-xy-zero, var(--y));
-}
-:host(.vertical-layout) #dialog {
-display: flex;
-xflex-direction: column;
-}
-:host(:not([name])) #titlebar {
-display: none;
-}
-#titlebar {
-text-align: center;
-display: flex; padding: 3px 2px 2px 2px;
-font: var(--modal-dialog-titlebar-font, bold 1em system-ui);
-touch-action: none; min-height: 1em;
-xborder: thick solid purple;
-}
-@media (pointer: coarse) {
-:host(.dotted[name]:not([name=""])) #titlebar { font-size: var(--modal-dialog-titlebar-boost, 1em); }
-}
-:host(.inactive) #titlebar { color: #555; }
-:host(.frameless) #titlebar {
-background: white;
-border: thin solid currentColor;
-border-bottom: thin solid #AAA8;
-}
-:host(:not(.frameless)) #titlebar {
-xpadding: 4px 4px 0px 4px;
-padding: 3px 3px 0px 3px;
-xpadding-bottom: 0px;
-xpadding-top: 4px;
-}
-:host(.nopadding) #titlebar {
-border-bottom: thin solid var(--dialog-border);
-padding-bottom: 2px;
-}
-:host #titlebar > div {
-flex: 1;
-xpadding-bottom: 2px;
-}
-:host(:not(.frameless)) #titlebar > div {
-flex: 1;
-padding-bottom: 1px;
-}
-:host(:not(.inactive)) #titlebar > div {
-background: linear-gradient(to bottom, black 0%, gray 33.33%, transparent 40%, transparent 100%);
-background-size: 100% 3px;
-background-clip: content-box;
-/*background: linear-gradient(to bottom, #444 0%, #444 50%, transparent 50%, transparent 100%);
-background-size: 100% 2.5px;
-margin-bottom: -1px;*/
-}
-:host(.dotted:not(.inactive)) #titlebar > div {
-background-image: radial-gradient(#669 0.75px, #BBB2 0);
-background-size: 4px 4px;
-xopacity: 0;
-}
-:host(.dotted) #titlebar {
-padding: 2px;
-}
-:host/*(:not(.dotted))*/ #titlebar {
-margin-top: 1px;
-}
-/*:host(.closebox) #closebox, :host #zoombox {
-display: inline-block; width: min(13px,0.85em); height: min(13px,0.85em); border: 1px solid currentColor; background: white; vertical-align: top;
-outline: 1px solid white; box-sizing: border-box; position: relative; top: 3px;
-}
-:host #zoombox:before {
-position: absolute; content: ""; left: -1px; top: -1px; right: 0.3em; bottom: 0.3em; border: 1px solid currentColor;
-}
-*/
-:host(.closebox) #closebox, :host #zoombox {
-display: inline-block; width: 1em; height: 1em; border: 1px solid currentColor; background: white; vertical-align: top;
-outline: 2px solid white; box-sizing: border-box; position: relative;
-}
-:host #zoombox:before {
-position: absolute; content: ""; left: -1px; top: -1px; width: 0.6em; height: 0.6em; border: 1px solid currentColor; box-sizing: border-box;
-}
-:host #zoombox:active:hover:before {
-left: -2px; top: -2px; border-width: 2px; width: calc(0.6em + 0.5px); height: calc(0.6em + 0.5px);
-}
-
-:host #closebox:after, :host #zoombox:after {
-position: absolute; content: ""; left: -4px; top: -4px; right: -4px; bottom: -4px; border-radius: 4px; box-sizing: border-box;
-}
-:host #closebox:active:hover, :host #zoombox:active:hover {
-border: 2px solid currentColor;
-}
-@media(pointer: coarse) {
-:host #closebox:after, :host #zoombox:after
-{ left: -10px; top: -10px; right: -10px; bottom: -10px; }
-:host #closebox:active:after, :host #zoombox:active:after
-{ background: #4444; }
-}
-
-:host(.inactive) #titlebar .boxmargin {
-visibility: hidden;
-}
-:host(:not(.closebox)) #titlebar .boxmargin.left,
-:host(:not(.zoombox)) #titlebar .boxmargin.right {
-display: none;
-}
-:host(.inactive) #titlebar .boxmargin {
-pointer-events: none;
-}
-:host #titlebar > #title {
-display: inline-block; pointer-events: none;
-background: inherit;
-}
-:host #titlebar > #title[data-name=""] { display: none; }
-:host #titlebar > #title:after {
-display: inline-block;
-content: '\\A0\\A0' attr(data-name) '\\A0\\A0';
-xfont: caption;
-}
-/* i tired of userbubble */
-/*:host(.userbubble) #titlebar > #title {
-
-border: 1px dotted #BBB; background: #BBB4; padding: 1px 3px; margin: -1px 1px;
-border-radius: 2px 0.5em 2px 2px ;
-}
-:host(.userbubble) #titlebar > #title:after {
-xcontent: '\\A0🌐\\A0' attr(data-name) '\\A0';
-content: '\\A0' attr(data-name) '\\A0';
-max-height: 1em; line-height: 1;
-}*/
-
-:host #content {
-position: relative;
-pointer-events: auto;
-clip-path: inset(0px 0px);
-xoverflow: auto;
-}
-:host(:not(.nopadding):not(.frameless)) #content {
-padding: 0.5em;
-margin: 3px 2px 2px 2px;
-border: 2px solid black;
-}
-:host(.nopadding) #content {
-padding: 0px;
-}
-</style>`);
-
-
-// 'the card window' has simple properties
-function card_window_delegate(element,template)
-{
-var md;
-return {
-connectToDialog(value) { md = value; },
-get name() { return md.name; },
-get shortName() { return md.name; },
-get longName() { return md.name; },
-get rectangle() { return [0,0, element.width, element.height]; },
-set rectangle(value) {
-var r = rectangle(value);
-md.shadowRoot.qs('#content').style.overflow = 'hidden';
-element.width = r[2] - r[0];
-element.height = r[3] - r[1];
-},
-get top() { return 0; },
-get left() { return 0; },
-get width() { return md.shadowRoot.qs('#content').offsetWidth; },
-set width(value) { md.shadowRoot.qs('#content').style.width = number(value)+'px'; },
-get height() { return md.shadowRoot.qs('#content').offsetHeight; },
-set height(value) { md.shadowRoot.qs('#content').style.height = number(value)+'px'; },
-get scroll() { return [md.shadowRoot.qs('#content').scrollLeft, md.shadowRoot.qs('#content').scrollTop]; },
-set scroll(value) {
-var p = point(value);
-md.shadowRoot.qs('#content').scroll({left:p[0],top:p[1],behaviour:'smooth'});
-},
-
-};
-}
-ElementTemplate.Create("card-window-delegate", "scroll,rectangle|rect,width,height", "",);
 
 "use strict";
 function xtalk_common_template(element, template)
@@ -4264,6 +4197,13 @@ return 'stack "'+element.name+'"';
 if (type == 'button' || type == 'field')
 type = { 'card-part': 'card ', 'background-part': 'bkgnd ', '-': '' }[(element.closest('card-part,background-part')||{nodeName:'-'}).nodeName.toLowerCase()] + type;
 return type + ' ' + (/*element.name ? '"'+element.name+'"' :*/ element.id ? 'id ' + element.id : element.number);
+},
+get longNumber() {
+var type = element.nodeName.toLowerCase().split('-',1)[0];
+if (type == 'stack')
+return 'stack "'+element.name+'"';
+var layerName = { 'card-part': 'card ', 'background-part': 'bkgnd ', '-': '' }[(element.closest('card-part,background-part')||{nodeName:'-'}).nodeName.toLowerCase()];
+return layerName + ((type == 'button' || type == 'field') ? type : '') + (element.owner ? ' ' + element.number : '');
 }
 };
 }
@@ -4275,8 +4215,8 @@ stack-part {
 --card-width: 512px; --card-height: 342px;
 --modal-dialog-modal-absolute: absolute;
 outline: none;
+position: relative;
 z-index: 0;
-xmargin: 4px; /*0px 8px 20px 0px;*/
 width: var(--card-width);
 height: var(--card-height);
 }
@@ -4286,9 +4226,11 @@ user-select: none; -webkit-user-select: none;
 -webkit-touch-callout: none;
 -webkit-tap-highlight-color: transparent;
 }
+stack-part > card-part > *
+{ transform: translate3d(0,0,0); } 	/* this, finally, seems to fix the ghastly transform clipping bug in Safari */
+
 stack-part div[contenteditable]
 { user-select: initial; -webkit-user-select: initial; }
-
 .bold { font-weight: bold; }
 .underline { text-decoration: underline; }
 .italic { font-style: italic; }
@@ -4393,6 +4335,8 @@ stack-part[tool="Curve" i],
 stack-part[tool="Polygon" i],
 stack-part[tool="Select" i]
 { cursor: crosshair; }
+stack-part[tool="Text" i]
+{ cursor: text; }
 stack-part[tool="Pencil" i]:active,
 stack-part[tool="Brush" i]:active,
 stack-part[tool="Eraser" i]:active
@@ -4424,6 +4368,7 @@ stack-part[tool="Button" i], stack-part[tool="Field" i] {
 }
 stack-part[tool="Field" i] field-part {
 --special-field-tool-background: repeating-linear-gradient(var(--background, transparent), var(--background, transparent) calc(1.125em - 1px), #CCC 1.125em);
+--special-field-tool-background-color-attribute: repeating-linear-gradient(var(--color-attribute, var(--background, transparent)), var(--color-attribute, var(--background, transparent)) calc(1.125em - 1px), #CCC 1.125em);
 }
 stack-part[tool="Button" i]:not(.background-mode)
 { --card-button-part-outline: 1px solid black; --bkgnd-button-part-outline: 1px solid gray; }
@@ -4477,7 +4422,8 @@ transform: scale(1) translate(0,0);
 
 ` + '</style>');"use strict";
 document.addEventListener('keydown',(event)=>{
-if (event.isTrusted && sim.stack && (document.activeElement === body || sim.stack.contains(document.activeElement)))
+if ('sim' in window && event.isTrusted && sim.stack && !body.classList.contains('command')
+&& (document.activeElement === body || sim.stack.contains(document.activeElement) || sim.stack.parentNode===document.activeElement))
 return sim.stack.card_key_down(event);
 });
 
@@ -4558,13 +4504,15 @@ target = get_visible_buttonorfield_at(event.clientX, event.clientY) || layer;
 
 if (target.matches('button-part[enabled="false" i]'))
 return;
+
 //console.log(target);
 // send the hc mouse messages
 var mouseloc = clickloc, activehover = true;
 sim.clickLoc = Math.round(clickloc.x)+','+Math.round(clickloc.y);
 sim.mouseLoc = Math.round(mouseloc.x)+','+Math.round(mouseloc.y);
-//sim.mouse = activehover ? 'down' : 'up';
 sim.mouse = 'down';
+element.mouse = 'down';
+element.mouseClick = true;
 element.isProcessingMouseDown = true;
 
 //XTalk.Send(target || layer, 'mouseDown');
@@ -4577,7 +4525,6 @@ element.isProcessingMouseDown = isdown;
 if (!isdown) {
 if (activehover && target && target.matches(`button-part[family]`) && target.autoHilite && target.enabled != 'false')
 target.hilite = true;
-
 if (!abortmsgs && !(target && target.matches(`button-part[type="Popup" i]`))) XTalk.Send(target || layer, activehover ? 'mouseUp' : 'mouseCancel', []);
 //console.log('click completed');
 element.isProcessingMouseDown = false;
@@ -4602,7 +4549,7 @@ activehover = (event.clientX >= bcr.x && event.clientX < bcr.right && event.clie
 //sim.put(activehover + ' ' + Date.now() + fun.nodeName);
 sim.mouseLoc = Math.round(mouseloc.x)+','+Math.round(mouseloc.y);
 //sim.mouse = activehover ? 'down' : 'up';
-sim.mouse = 'down';
+//sim.mouse = 'down';
 },
 (event, begin)=>{
 if (begin == true) {
@@ -4614,6 +4561,7 @@ else
 {
 isdown = false;
 sim.mouse = 'up';
+element.mouse = 'up';
 if (begin == 'cancel') activehover = false;
 if (!msdtimeout) nextstep();
 }
@@ -4622,9 +4570,19 @@ if (!msdtimeout) nextstep();
 return;
 }
 
-if (['pencil','eraser','bucket','line','rectangle','round rect','oval','curve','polygon','brush','select','martin'].includes(element.tool.toLowerCase()))
+if (['pencil','eraser','bucket','line','rectangle','round rect','oval','curve','polygon','brush','select','text','martin'].includes(element.tool.toLowerCase()))
 {
 /* painting tool click */
+if (element.tool.toLowerCase() =='text' && event.composedPath)
+{
+if (layer.shadowRoot.qs('.text-tool-overlay').contains(event.composedPath()[0]))
+return;
+if (layer.shadowRoot.qs('.text-tool-overlay field-part'))
+{
+layer.shadowRoot.qs('.text-tool-overlay field-part').blur();
+//debugger;
+}
+}
 
 //element.focus();
 if (layer) paint_mouse_down(event, layer, clickloc);
@@ -4736,6 +4694,7 @@ if (to_begin=='cancel')
 clearTimeout(longpress);
 else if (!to_begin) {
 element.selectedPart = target;
+element.refreshAddColorStage();
 if (window.NBU2) NBU2.RegisterAction(()=>{ if (cloned_target) layer.removeChild(target); else target.rect = clickRect; element.selectedPart = cloned_target||target; },
 ()=>{ if (cloned_target) layer.appendChild(target); else target.rect = newrect; element.selectedPart = target; });
 }
@@ -4850,6 +4809,83 @@ layer.markCanvasUsed();
 allowundo();
 });
 }
+else if (tool == 'text')
+{
+var f = document.createElement('field-part');
+f.style = "margin: -4px; padding: 4px; margin-top: -0.8em; padding-top: -0.8em; outline: 1px dotted #8888; outline-offset: -0.25em";
+if (window.painttext_proxy)
+['textFont','textSize','textStyle','textAlign','textHeight'].forEach((a)=>f[a]=painttext_proxy[a]);
+f.addEventListener('blur', (event)=>{
+if (f.dontBlur) return;
+
+function getLineBreaks(node) {
+// https://stackoverflow.com/questions/55604798/find-rendered-line-breaks-with-javascript
+// we only deal with TextNodes
+// our Range object form which we'll get the characters positions
+const range = document.createRange();
+// here we'll store all our lines
+const lines = [];
+// begin at the first char
+range.setStart(node, 0);
+// initial position
+let prevBottom = range.getBoundingClientRect().bottom;
+let str = node.textContent;
+let current = 1; // we already got index 0
+let lastFound = 0;
+let bottom = 0;
+// iterate over all characters
+while(current <= str.length) {
+// move our cursor
+range.setStart(node, current);
+if(current < str.length -1)
+range.setEnd(node, current+1);
+bottom = range.getBoundingClientRect().bottom;
+if(bottom > prevBottom) { // line break
+lines.push(
+str.substr(lastFound , current - lastFound)
+);
+prevBottom = bottom;
+lastFound = current;
+}
+current++;
+}
+// push the last line
+lines.push(str.substr(lastFound));
+
+return lines;
+}
+var nodes = document.createTreeWalker(f.contentsContainer(), NodeFilter.SHOW_TEXT, null, null), tn = nodes.nextNode();
+if (tn) {
+const range = document.createRange();
+range.setStart(tn, 0);
+var bcr1 = range.getBoundingClientRect(), sp1 =stackpoint({ clientX: bcr1.x, clientY: bcr1.y },true);
+context.font = getComputedStyle(f).font;
+context.textBaseline = 'top';
+context.fillStyle = 'black';
+var lh = parseFloat(getComputedStyle(f).fontSize) * 1.2;
+//console.log(getComputedStyle(f).font, parseFloat(getComputedStyle(f).fontSize));
+do { getLineBreaks(tn).forEach((t,i)=>{ context.fillText(t,sp1.x,sp1.y); sp1.y+=lh; }); } while (tn = nodes.nextNode());
+}
+f.parentNode.removeChild(f);
+layer.markCanvasUsed();
+allowundo();
+});
+f.onkeyup = ()=>{
+var range = layer.shadowRoot.getSelection().getRangeAt(0);
+if (range)
+console.log(f.contentsContainer().innerHTML, range.commonAncestorContainer, range.startContainer, range.startOffset, range.endContainer, range.endOffset);
+else console.log(f.contentsContainer().innerHTML, 'no range');
+/*if (range.commonAncestorContainer===f)
+{ debugger; f.FixCENow(); }*/
+}
+layer.shadowRoot.qs('.text-tool-overlay').appendChild(f);
+f.topLeft = [clickloc.x, clickloc.y];
+f.contents = "";
+f.focus();
+getSelection().selectAllChildren(f);
+getSelection().collapseToStart();
+//console.log(f);
+}
 else if (tool == 'line' || tool == 'rectangle' || tool == 'round rect' || tool == 'oval' || tool == 'curve' || tool == 'polygon')
 {
 var curvepoints = [clickloc], optionclick = body.classList.contains('option'), currentpoint = clickloc;
@@ -4862,6 +4898,7 @@ var shrink = 2;	// adjust for pattern blowing up
 context.scale(1/shrink,1/shrink);
 
 follow_mouse(event, (event)=>{
+if (undoLayer)
 context.putImageData(undoLayer, 0, 0);
 currentpoint = stackpoint(event);
 context.beginPath();
@@ -4943,6 +4980,7 @@ curvepoints.push(currentpoint);
 
 follow_mouse(event, (event)=>{
 currentpoint = stackpoint(event);
+if (undoLayer)
 context.putImageData(undoLayer, 0, 0);
 context.beginPath();
 context.moveTo(clickloc.x*shrink,clickloc.y*shrink);
@@ -5193,9 +5231,14 @@ function card_key_down(event)
 if (event.metaKey) return;
 //console.log('card key down ' + event.key);
 
-var meta = event.metaKey || event.ctrlKey;
+var meta = event.metaKey || event.ctrlKey, tool = element.tool.toLowerCase();
 
-if (element.tool=='Browse')
+if (tool=='text')
+{
+// typing is fine
+return;
+}
+else if (tool=='browse')
 {
 //console.log(event);
 var cefae = ContentEditableFix.ActiveElement();
@@ -5203,7 +5246,7 @@ if (cefae.nodeName != 'FIELD-PART') cefae = null;
 //else if (event.key.substr(0,5)=='Arrow' && body.classList.contains('arrow-keys-in-text')) event.preventDefault();
 //console.log('key event ' + event.code + '/' + event.key);
 
-var ascii = { 'ArrowLeft': 28, 'ArrowRight': 29, 'ArrowUp': 30, 'ArrowDown': 31, 'Enter': 13, 'Tab': 9 }[event.key];
+var ascii = { 'ArrowLeft': 28, 'ArrowRight': 29, 'ArrowUp': 30, 'ArrowDown': 31, 'Enter': 13, 'Tab': 9, 'Backspace': 8 }[event.key];
 
 // if the keyDown message is passed to the simulator script, it will send returnKey, arrowKey, etc.
 if (ascii || event.key.length == 1)
@@ -5227,7 +5270,7 @@ if (window.NBU2) NBU2.RegisterAction(()=>{ parent.insertBefore(target, sibling);
 parent.removeChild(target);
 element.selectedPart = null
 }
-else if (element.tool == 'Select' && event.key=='Backspace')
+else if (tool == 'select' && event.key=='Backspace')
 {
 if (element.currentLayer.pickItUp) element.currentLayer.pickItUp(true);
 element.currentLayer.pickItUp = element.currentLayer.putItDown = null;
@@ -5329,8 +5372,11 @@ stackQueue.stateChangeWatcher = function(inprocess) {
 //if (element.parentNode) element.parentNode.classList.toggle('waiting', inprocess);
 
 if (!inprocess) {
+// this should all be on the stack, not the sim!
 delete sim.itemDelimiter;
 element.visualEffect = '';
+element.mouseClick = '';
+sim.lockMessages = false;
 }
 }
 
@@ -5354,7 +5400,7 @@ else { target = target.parentNode; }
 }
 return target;
 },
-clickDrag(startx, starty, stopx, stopy)
+clickDrag(startx, starty, stopx, stopy, modifiers)
 {
 var bcr = element.getBoundingClientRect();
 var startevent = new MouseEvent('simulateddown', { bubbles: true,
@@ -5386,17 +5432,21 @@ if (!card) throw "Can't find that card";
 if (card.closest('stack-part') !== element) throw "Not a card in this stack";
 if (card===currentCard) return;
 //console.log('going to card id ' + card.id);
-
+var was_currentCard = currentCard;
 if (!!(currentCard=element.card))
 {
-var was_currentCard = currentCard, md = element.closest('#stackcontainer > modal-dialog');
+if (was_currentCard && 'push_recent_card' in window && !recent_cards.lock_recent_cards)
+push_recent_card(currentCard);
+
+//var md = element.closest('#stackcontainer > modal-dialog');
 //if (md && md.enable_mutation_observer)
 //	md.enable_mutation_observer(false);	// turn off the mutations observer . Changing cards by itself shouldn't trigger a save.
 
 currentCard.classList.remove('current', 'forward-card', 'back-card');
 
 // push the card we're leaving IF we're not going back
-if (!element.recently_visited_cards.lock_recent_cards) {
+if (was_currentCard && !element.recently_visited_cards.lock_recent_cards) {
+
 element.recently_visited_cards.push(currentCard);
 if (element.recently_visited_cards.length > 40)
 element.recently_visited_cards.shift();
@@ -5456,14 +5506,31 @@ throw "card id " + card.ID + " has no background id " + card.bkgndID;
 // visual effects, but could make something weird or slow. Verified that background card text still works.
 if (true || !bkgnd.cloned_node)
 {
+// maybe it would be easier to make two background clones period and switch between as needed
+
 var srcbkgnd = bkgnd.cloned_node || bkgnd;
 
 //if (bkgnd.cloned_node) console.log('loading from a clone'); else console.log('loading from the original');
 
 // I need to put the cloned_node in there BEFORE cloning so icons know where they're coming from ! otherwise stackOf is wrong during startup, when the stack that is in front may not be the one loading.
 (bkgnd.cloned_node=srcbkgnd.cloneNode(true)).clone_of = bkgnd;	// ok the clone node could use links back to the original for the field maybe
-//srcbkgnd.childNodes.forEach((n)=>bkgnd.cloned_node.appendChild(n.cloneNode));
-// lets think this through first. I changed set savableJSON so it puts the child in first, and then sets all the properties and adds the children. That improved icon loading because buttons had a path back to find the right icon.
+bkgnd.cloned_node.card_for_bkgnd_clone = card;
+
+// what does it take to insta-load an img in Safari? Chrome doesn't have any trouble.
+// stealing the background images from the old one is not so bad; there is a small flicker during the visual effect slide though.
+var iconButtons = bkgnd.cloned_node.qsa('button-part[icon]').forEach((btn)=>{
+var fromBtn = srcbkgnd.childNodes[Array.from(btn.parentNode.childNodes).indexOf(btn)] /*srcbkgnd.qs('button-part[icon="' + btn.icon + '" i]')*/, fromImg, toImg;
+if (fromBtn && fromBtn.shadowRoot && (fromImg=fromBtn.shadowRoot.qs('#icon img')) && fromImg.getAttribute('src')
+&& btn.shadowRoot && (toImg=btn.shadowRoot.qs('#icon img'))) {
+var clone = fromImg.cloneNode();
+fromImg.parentNode.insertBefore(clone, fromImg);
+clone.style.width = fromImg.offsetWidth ? fromImg.offsetWidth + 'px' : '';
+clone.style.height = fromImg.offsetHeight ? fromImg.offsetHeight + 'px' : '';
+clone.style.background = 'url(' + fromImg.src + ')';
+toImg.parentNode.replaceChild(fromImg,toImg);
+//							console.log('cloned ' + (toImg.src=fromImg.src));
+}
+});
 
 var bitmap = srcbkgnd.savableJSON.bitmap;
 
@@ -5475,10 +5542,9 @@ bkgnd.cloned_node.card_bitmap_to_load = { dataURL: bitmap, WOBA: (srcbkgnd.card_
 //if (srcbkgnd.bitmap)
 //	bkgnd.cloned_node.bitmap = srcbkgnd.bitmap;
 
-makeclonemutationobserver();
-function makeclonemutationobserver()
+makeclonemutationobserver(bkgnd);
+function makeclonemutationobserver(savebkgnd)
 {
-var savebkgnd = bkgnd;
 new MutationObserver((mlist)=>{
 //	console.log(mlist);
 //	console.log('mutated bkgnd clone',mlist);
@@ -5507,18 +5573,30 @@ currentCard.shadowRoot.qs('span.background').parentNode.insertBefore((currentCar
 
 bkgnd.cloned_node.prepareToShow();
 
-var hasAddColorData, useAddColorData = {
-'--colorData-background-for-bkgnd': bkgnd.addColorCSS(element.localPICTs).background,
-'--colorData-background-size-for-bkgnd': bkgnd.addColorCSS(element.localPICTs).size,
-'--colorData-background-blend-mode-for-bkgnd': bkgnd.addColorCSS(element.localPICTs).blendMode,
-'--colorData-background-for-card': card.addColorCSS(element.localPICTs).background,
-'--colorData-background-size-for-card': card.addColorCSS(element.localPICTs).size,
-'--colorData-background-blend-mode-for-card': card.addColorCSS(element.localPICTs).blendMode
+element.refreshAddColorStage();
+
+card.prepareToShow();
+
+element.dispatchEvent(new Event('openCard', { bubbles: true }));
+element.checkIfIdleMessagesAllowed();
+},
+refreshAddColorStage()
+{
+var card = element.card, bkgnd = element.background, hasAddColorData,
+bkgndCSS = bkgnd.produceAddColorCSS(element.localPICTs), cardCSS = card.produceAddColorCSS(element.localPICTs),
+useAddColorData = {
+'--colorData-background-for-bkgnd': bkgndCSS.background,
+'--colorData-background-size-for-bkgnd': bkgndCSS.size,
+'--colorData-background-blend-mode-for-bkgnd': bkgndCSS.blendMode,
+'--colorData-background-for-card': cardCSS.background,
+'--colorData-background-size-for-card': cardCSS.size,
+'--colorData-background-blend-mode-for-card': cardCSS.blendMode
 };
 for (var acd in useAddColorData) {
 card.shadowRoot.qs('#cardcolor').style.setProperty(acd, useAddColorData[acd]);
-hasAddColorData = hasAddColorData || !!useAddColorData[acd];
+//hasAddColorData = hasAddColorData || !!useAddColorData[acd];
 }
+hasAddColorData = card.addColorData || bkgnd.addColorData;	// have an AddColor stage mode
 if (hasAddColorData) {
 card.shadowRoot.qs('#cardcolor').setAttribute('hasAddColorData', 'true');
 card.shadowRoot.qs('div.display').setAttribute('hasAddColorData', 'true');
@@ -5527,11 +5605,6 @@ else {
 card.shadowRoot.qs('#cardcolor').removeAttribute('hasAddColorData');
 card.shadowRoot.qs('div.display').removeAttribute('hasAddColorData');
 }
-
-card.prepareToShow();
-
-element.dispatchEvent(new Event('openCard', { bubbles: true }));
-element.checkIfIdleMessagesAllowed();
 },
 GoCoroutine:function*(card)
 {
@@ -5553,6 +5626,7 @@ yield*xtalk_send_coroutine('closeCard', [], element.card);
 if (changeBkgnd)
 yield*xtalk_send_coroutine('closeBackground', [], element.card);
 }
+
 
 element.recently_visited_cards.lock_recent_cards = goingBack;
 element.card = card;
@@ -5679,13 +5753,21 @@ return bkgnds.length;
 ordinal=number(ordinal);
 return bkgnds[ordinal-1];
 },
-newCard() {
-var target = document.createElement('card-part'), maxid = 0;
-target.bkgndID = currentCard.bkgndID;
+newCard(newBackground) {
+var target = document.createElement('card-part'), maxid = 0, bkgndID = currentCard.bkgndID;
 element.qsa(':scope > card-part').forEach((e)=>maxid=Math.max(maxid,Number(e.id)||0));
 target.id = maxid + 1;
+if (newBackground)
+{
+var newbg = document.createElement('background-part');
+maxid = 0;
+element.qsa(':scope > background-part').forEach((e)=>maxid=Math.max(maxid,Number(e.id)||0));
+newbg.id = bkgndID = (maxid+1);
+element.insertBefore(newbg, currentCard.nextSibling);
+}
+target.bkgndID = bkgndID;
 element.insertBefore(target, currentCard.nextSibling);
-setTimeout(()=>element.card = target, 0);
+element.card = target;
 return target;
 },
 deleteCard(target) {
@@ -5723,6 +5805,7 @@ getSelection().removeAllRanges();
 },
 set tool(value) {
 element.clearUserSelections();
+element.refreshAddColorStage();
 element.checkIfIdleMessagesAllowed();
 },
 get localICONs() {
@@ -5788,14 +5871,6 @@ element[a] = json[a];
 });
 var initWAVs = element.localWAVs;	// inits the sound
 
-if (json.importedPLTEs)
-{
-var ps = JSON.parse(json.importedPLTEs);
-console.log(ps);
-for (var p in ps)
-create_palette(ps[p], p);
-}
-
 var maxid = 0;
 (json.$$||[]).forEach((c)=>{ if (c.$ && c.$.toLowerCase()=='card-part') maxid = Math.max(maxid, Number(c.id)||0); });
 (json.$$||[]).forEach((c)=>{ if (c.$ && c.$.toLowerCase()=='card-part' && !c.id && !c.ID && !c.iD && !c.Id)
@@ -5841,7 +5916,7 @@ if (element[a])
 stackjson[a] = element[a];
 });
 
-/*if (element.localICONs.length)
+if (element.localICONs.length)
 {
 var expandedICONsList = Object.assign({},element.localICONs);	// start with shallow copy
 element.querySelectorAll('button-part[icon]').forEach((btn)=>{
@@ -5856,7 +5931,7 @@ canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
 var ctx = canvas.getContext('2d');
 ctx.drawImage(img,0,0);
 return canvas.toDataURL('image/gif');
-}*/
+}
 
 return better_emit_json_as_html(stackjson,1);
 },
@@ -5909,6 +5984,8 @@ position: relative;
 background: white;
 --pointer-cursor: url(ui-icons/BrowseCursor.bmp) 6 0;
 cursor: var(--pointer-cursor), pointer;
+xcontain: paint size style; /* layout triggers 4px margin below us */
+
 }
 </style>`);
 
@@ -6003,8 +6080,12 @@ set color(value) {
 template.qs('#cardcolor').style.setProperty('--background', element.color);
 //template.qs('#cardcolor').style.background = value;
 },
-addColorCSS(localPICTs) {	// pass in stack.localPICTs[]
-// it would be nice to have the card refresh this if the addColorData attribute changes
+set addColorData(value) {
+var stack = sim.stackOf(element,true);
+if (stack && (stack.card===element || stack.background===element))
+stack.refreshAddColorStage();
+},
+produceAddColorCSS(localPICTs) {	// pass in stack.localPICTs[]
 var cssB = [], cssBS = [], cssBBM = [];
 JSON.parse(element.addColorData || '[]').forEach((obj)=>{
 if (obj.type=='rectangle')
@@ -6022,6 +6103,13 @@ else return;
 cssBS.push((obj.right-obj.left) + 'px ' + (obj.bottom-obj.top) + 'px');
 cssBBM.push((obj.type=='picture' && obj.transparent) ? 'multiply' : 'normal');
 });
+element.qsa(':scope > button-part[color], :scope > field-part[color]').forEach((p)=>{
+if (!p.visible) return;
+var bevel = Math.abs(parseInt(p.bevel)), obj = { color: p.color, left: p.left+bevel, top: p.top+bevel, right: p.right-bevel, bottom: p.bottom-bevel };
+cssB.push('linear-gradient(to bottom, ' + obj.color + ' 0% , ' + obj.color + ' 100%) ' + obj.left + 'px ' + obj.top + 'px no-repeat');
+cssBS.push((obj.right-obj.left) + 'px ' + (obj.bottom-obj.top) + 'px');
+cssBBM.push((obj.type=='picture' && obj.transparent) ? 'multiply' : 'normal');
+});
 return { 'background': cssB.reverse().join(', '), 'size': cssBS.reverse().join(', '), 'blendMode': cssBBM.reverse().join(', ') };
 },
 get canvas() {
@@ -6036,7 +6124,7 @@ canvas.width = element.width * dpr;
 canvas.height = element.height * dpr;
 //if (element.name=='A') debugger;
 
-context2d = canvas.getContext('2d');
+context2d = canvas.getContext('2d', { willReadFrequently: true, antialias: false });
 context2d.lineWidth = 1;
 context2d.strokeStyle = 'black';
 context2d.scale(dpr,dpr);
@@ -6050,7 +6138,7 @@ if (!context2d)
 context2d = element.canvas.getContext("2d");
 context2d.gray_src = grayPngImg.src;
 context2d.gray_pattern = context2d.createPattern(grayPngImg, "repeat");
-
+//context2d.globalCompositeOperation = 'source-over';
 /*const img = new Image();
 img.src = "ui-icons/gray.png";
 img.onload = () => {
@@ -6147,25 +6235,13 @@ element.setAttribute('bitmap', element.savableJSON.bitmap || '');
 element.setAttribute('data-mutator', Date.now()); 	// trigger mutation observer
 }, 10);
 },
-fld(n)
-{ return element.qsa('field-part')[n-1]; },
-btn(n)
-{ return element.qsa('button-part')[n-1]; },
-partOf(selector, ordinal) {
-var parts = element.qsa(selector);
-
-if (ordinal==='last')
-return parts[parts.length-1];
-if (ordinal==='middle')
-return parts[Math.floor(parts.length/2)];
-if (ordinal==='any')
-return parts[Math.floor(Math.random()*parts.length)];
-if (ordinal==='number')
-return parts.length;
-
-ordinal=number(ordinal);
-return parts[ordinal-1];
+fld(n) {
+return element.qsa('field-part')[number(n)-1];
 },
+btn(n)
+{ return element.qsa(element.qsa('button-part'))[number(n)-1]; },
+part(n)
+{ return element.qsa(element.qsa('button-part,field-part'))[number(n)-1]; },
 get maxID() {
 var maxid = 0;
 element.qsa('button-part,field-part').forEach((e)=>maxid=Math.max(maxid,Number(e.id)||0));
@@ -6183,12 +6259,13 @@ get rectangle() { return [0,0,(element.clone_of || element).closest('stack-part'
 
 }
 }
-ElementTemplate.Create("card-or-background-template", "color,ID=0,dontSearch=false,cantDelete=false,showPict=true,bitmap,addColorData", "xtalk-common-template",`<div id="cardcolor"></div><div class="display"><span class="background"></span><span class="canvas"></span><canvas id="select" width="0" height="0"></canvas><slot></slot></div><style>
+ElementTemplate.Create("card-or-background-template", "color,ID=0,dontSearch=false,cantDelete=false,showPict=true,bitmap,addColorData=''", "xtalk-common-template",`<div id="cardcolor"></div><div class="display"><span class="background"></span><span class="canvas"></span><span class="text-tool-overlay"></span><canvas id="select" width="0" height="0"></canvas><slot></slot></div><style>
 :host {
 position: relative; display: inline-block;
 --stack-or-card-width: calc(var(--stack-width, var(--card-width)));
 --stack-or-card-height: calc(var(--stack-height, var(--card-height)));
 touch-action: var(--tool-touch-action);
+contain: paint size style; /* layout triggers 4px margin below us */
 }
 :host #cardcolor
 {
@@ -6202,7 +6279,6 @@ top: 0;
 right: 0;
 bottom: 0;
 padding: 0px; margin: 0px;
-xborder: thin solid red;
 }
 :host span.canvas, :host span.background {	/* stand in location for canvas if not used */
 display: none;
@@ -6215,8 +6291,7 @@ background: transparent;
 position: absolute; left: 0px; top: 0px;
 width: calc(var(--stack-or-card-width) - 0px); height: var(--stack-or-card-height);
 pointer-events: none;
-xmargin-right: -1px; xborder-right: 1px solid transparent;	/* This might fix Safari's bug with not drawing the backgrounds or beign in srcOr or something. However it stops working if the overflow is hidden. */
-xz-index: -1; /* this alone seems to fix it, and now overflow is ok, but now background buttons are on top of card paint.... */
+xmargin-right: -4px; xborder-right: 4px solid red;	/* This might fix Safari's bug with not drawing the backgrounds or beign in srcOr or something. However it stops working if the overflow is hidden. */
 }
 
 /* this gets the layering right, but now clicks in the background don't register */
@@ -6248,10 +6323,9 @@ height: var(--stack-or-card-height);
 --first-field-line-line-height: 1;
 }
 
-card-part button-part { outline: var(--card-button-part-outline); pointer-events: var(--card-or-bkgnd-part-pointer-events); cursor: var(--pointer-cursor), pointer; }
-/* use thin solid transparent or Safari won't blink caret in an empty field */
-card-part field-part { outline: var(--card-field-part-outline, thin solid transparent); pointer-events: var(--card-or-bkgnd-part-pointer-events); cursor: var(--pointer-cursor), pointer; }
-stack-part[tool]/*:not([tool="Button" i]):not([tool="Field" i])*/ > card-part field-part { outline: var(--card-field-part-outline); pointer-events: var(--card-or-bkgnd-part-pointer-events); }
+card-part button-part { outline: var(--card-button-part-outline, var(--part-outline)); pointer-events: var(--card-or-bkgnd-part-pointer-events); cursor: var(--pointer-cursor), pointer; }
+card-part field-part { outline: var(--card-field-part-outline, var(--part-outline)); pointer-events: var(--card-or-bkgnd-part-pointer-events); cursor: var(--pointer-cursor), pointer; }
+stack-part[tool] > card-part field-part { outline: var(--card-field-part-outline, var(--part-outline)); pointer-events: var(--card-or-bkgnd-part-pointer-events); }
 card-part a { pointer-events: var(--card-or-bkgnd-part-pointer-events); }
 card-part > iframe { outline: thin solid gray; position: relative; }
 card-part > video { position: relative; }
@@ -6288,7 +6362,10 @@ get number() {
 return Array.from(element.closest('stack-part').qsa(element.nodeName)).indexOf(element) + 1;
 },
 set number(value) {
-
+var stack = element.closest('stack-part'), group = Array.from(stack.qsa(element.nodeName));
+if ((value=Math.max(1, number(value))) < group.length)
+group[value-1].parentNode.insertBefore(element, group[value - (group.indexOf(element)>value ? 1 : 0)]);
+else stack.appendChild(element);
 }
 };
 }
@@ -6314,25 +6391,30 @@ width: var(--stack-or-card-width);
 height: var(--stack-or-card-height);
 --background: white;
 }
-:host background-part button-part { outline: var(--bkgnd-button-part-outline); pointer-events: var(--card-or-bkgnd-part-pointer-events); }
-:host background-part field-part { outline: var(--bkgnd-field-part-outline); pointer-events: var(--card-or-bkgnd-part-pointer-events); }
+:host background-part button-part { outline: var(--bkgnd-button-part-outline, var(--part-outline)); pointer-events: var(--card-or-bkgnd-part-pointer-events); }
+:host background-part field-part { outline: var(--bkgnd-field-part-outline, var(--part-outline)); pointer-events: var(--card-or-bkgnd-part-pointer-events); }
+
 :host background-part field-part:not([wideMargins="false" i]):not([sharedText]) { padding: 4px 5px; }
+:host background-part field-part[autoSelect]:not([autoSelect="false" i]) > div.selected { background: black; color: white; margin-left: -0.25em; margin-right: -0.25em; padding: 0 0.25em; }
+
+:host background-part > *
+{ transform: translate3d(0,0,0); } 	/* this, finally, seems to fix the ghastly transform clipping bug in Safari */
 
 /* this one works for background flds */
-:host background-part field-part:not([fixedLineHeight]) > div:nth-of-type(1):first-line { xcolor: green; line-height: var(--first-field-line-line-height); }
+:host /*background-part*/ field-part:not([fixedLineHeight]) > div:nth-of-type(1):first-line { xcolor: green; line-height: var(--first-field-line-line-height); }
 
-:host background-part .bold { font-weight: bold; }
-:host background-part .underline { text-decoration: underline; }
-:host background-part .italic { font-style: italic; }
-:host background-part .outline { -webkit-text-stroke: 0.5px black; text-stroke: 0.5px black; color: white; caret-color: black; font-weight: bold; }
-:host background-part .shadow { text-shadow: 1px 1px 2px gray; }
-:host background-part .outline.shadow { text-shadow: 1px 1px 0px black; letter-spacing: 1px; }
-:host background-part .condense:not(.extend) { letter-spacing: -1px; }
-:host background-part .extend:not(.condense) { letter-spacing: 1px; }
-:host background-part .group { text-decoration: underline; text-decoration-style: dotted; text-decoration-thickness: 2px;  }
-:host background-part [textAlign="left" i] { text-align: left; }
-:host background-part [textAlign="center" i] { text-align: center; }
-:host background-part [textAlign="right" i] { text-align: right; }
+:host /*background-part*/ .bold { font-weight: bold; }
+:host /*background-part*/ .underline { text-decoration: underline; }
+:host /*background-part*/ .italic { font-style: italic; }
+:host /*background-part*/ .outline { -webkit-text-stroke: 0.5px black; text-stroke: 0.5px black; color: white; caret-color: black; font-weight: bold; }
+:host /*background-part*/ .shadow { text-shadow: 1px 1px 2px gray; }
+:host /*background-part*/ .outline.shadow { text-shadow: 1px 1px 0px black; letter-spacing: 1px; }
+:host /*background-part*/ .condense:not(.extend) { letter-spacing: -1px; }
+:host /*background-part*/ .extend:not(.condense) { letter-spacing: 1px; }
+:host /*background-part*/ .group { text-decoration: underline; text-decoration-style: dotted; text-decoration-thickness: 2px;  }
+:host /*background-part*/ [textAlign="left" i] { text-align: left; }
+:host /*background-part*/ [textAlign="center" i] { text-align: center; }
+:host /*background-part*/ [textAlign="right" i] { text-align: right; }
 
 :host #cardcolor
 {
@@ -6346,6 +6428,7 @@ background-blend-mode: var(--stack-background-mode-normal, var(--colorData-backg
 }
 :host div.display[hasAddColorData=true] {
 mix-blend-mode: multiply;
+--hasAddColorData-inhibit-color: hasAddColorData-inhibit-color;
 }
 
 </style>`);
@@ -6383,7 +6466,6 @@ background-size: contain;
 "use strict";
 function button_or_field_template(element,template)
 {
-adjustFont();
 function adjustFont()
 {
 // hc lineheight is different! very mysterious. let's say if it's 32 then go to css lineheight 0
@@ -6402,6 +6484,7 @@ element.style.fontSize = element.textSize+'px';
 var styles = String(element.textStyle).toLowerCase().split(/[\W]+/g);
 ['bold','italic','underline','outline','shadow','condense','extend','group'].forEach((s)=>element.classList.toggle(s,styles.includes(s)));
 }
+adjustFont();
 
 return {
 get owner() {
@@ -6411,6 +6494,10 @@ get number() {
 return Array.from(element.owner.qsa(element.nodeName)).indexOf(element) + 1;
 },
 set number(value) {
+var group = Array.from(element.closest('card-part, background-part').qsa(element.nodeName));
+if ((value=Math.max(1, number(value))) < group.length)
+group[value-1].parentNode.insertBefore(element, group[value - (group.indexOf(element)>value ? 1 : 0)]);
+else element.owner.appendChild(element);
 },
 get partNumber() {
 return Array.from(element.owner.qsa('button-part,field-part')).indexOf(element) + 1;
@@ -6424,15 +6511,10 @@ else element.owner.appendChild(element);
 get visible() {
 return !element.matches('[visible="false" i]');
 },
-set textAlign(value) { adjustFont(); },
 set textFont(value) { adjustFont(); },
 set textSize(value) { adjustFont(); },
 set textStyle(value) { adjustFont(); },
-/*get textStyle() {
-var styles=[];
-['bold','italic','underline','outline','shadow','condense','extend'].forEach((s)=>{ if (element.classList.contains(s)) styles.push(s); });
-return styles.length ? styles.join(',') : 'plain';
-},*/
+set textAlign(value) { adjustFont(); },
 set textHeight(value) { adjustFont(); },
 set topLeft(value) {
 value = value && point(value) || '';
@@ -6524,6 +6606,7 @@ display: var(--override-visibility, none);
 /*opacity: 0; pointer-events: none; */
 }
 :host([topLeft]) { position: absolute; left: var(--left); top: var(--top); }
+:host([topleft][width][height]) { contain: strict; }
 </style>`);
 
 document.write('<style>' + `
@@ -6538,6 +6621,7 @@ card-part > div[slot] { outline: none; }
 /* this will work for card fields, but not background fields */
 field-part:not([fixedLineHeight="true"]) > div:nth-of-type(1):first-line { line-height: 1; } 	/* might help dunno yet */
 field-part[autoSelect]:not([autoSelect="false" i]) > div.selected { background: black; color: white; margin-left: -0.25em; margin-right: -0.25em; padding: 0 0.25em; }
+card-part > div[slot] > div.selected { background: black; color: white; margin-left: -0.25em; margin-right: -0.25em; padding: 0 0.25em; }
 
 ` + '</style>');"use strict";
 
@@ -6560,7 +6644,8 @@ XTalk.Send(element, wasDirty ? 'closeField' : 'exitField');
 }, true);
 
 element.addEventListener('pointerdown', (event)=>{
-var clickDiv = event.target.closest('field-part > div') || event.target.closest('div[slot] > div');
+var target = event.composedPath()[0] || event.target;
+var clickDiv = target.closest('field-part > div') || target.closest('div[slot] > div');
 //console.log(clickDiv);
 
 /*if (element.matches('[autoSelect]:not([autoSelect="false" i])'))
@@ -6593,16 +6678,12 @@ template.qs('#inner').contentEditable = !lock;
 }
 (ceTarget || element).contentEditable = !lock;
 }
-
+//if (element.name=='Safari') debugger;
 function setaddcolor() {
 element.style.setProperty('--fld-border', (element.color || element.bevel)
 ? ('calc(' + Math.abs(element.bevel||0) + 'px + var(--plusbevel, 0px)) ' + ((element.bevel < 0) ? 'inset' : 'outset') + ' ' + (element.color || ''))
 : '');
-element.style.setProperty('--background', element.color || '');
-
-//element.style.setProperty('--border', Math.abs(element.bevel||0) + 'px ' + (element.bevel < 0 ? 'inset' : 'outset') + ' ' + (element.color || '') );
-//element.style.setProperty('--background', element.color);
-//element.style.setProperty('--bevel', (element.bevel||0) + 'px');
+element.style.setProperty('--color-attribute', element.color || '');
 }
 setaddcolor();
 //element.style.setProperty('--background', element.color);
@@ -6719,15 +6800,31 @@ else if (!st && !bkgnd_content_slot
 && element.closest('background-part,card-part') && element.closest('background-part,card-part').matches('background-part'))
 element.assumeBkgndFieldDuty();
 },
+get selectedDiv() {
+// for autoSelect
+return element.contentsContainer().qs(':scope > div.selected');
+},
 get selectedText() {
 // for autoSelect
-return Array.from(element.contentsContainer().qsa(':scope > div.selected')).map((d,i)=>ContentEditableFix.InnerText(d)).join('\n');
+var text = Array.from(element.contentsContainer().qsa(':scope > div.selected')).map((d,i)=>ContentEditableFix.InnerText(d)).join('\n');
+text = (text[text.length-1]=='\n') ? text.substr(0,text.length-1) : text;
+return text;
+},
+set selectedText(value) {
+value = String(value).toLowerCase();
+var lines = Array.from(element.contentsContainer().qsa(':scope > div'));
+var index = lines.findIndex((d)=>{
+var text = ContentEditableFix.InnerText(d).toLowerCase();
+text = (text[text.length-1]=='\n') ? text.substr(0,text.length-1) : text;
+return (text.toLowerCase()==value);
+});
+lines.forEach((d,i)=>d.classList.toggle('selected', (i===index)));
 },
 get selectedLine() {
-// for autoSelect
-var min = 0, max = 0;
+// for autoSelect or for regular selection
+var min = 0, max = 0, sel = getSelection(), range = sel.rangeCount && sel.getRangeAt(0);
 Array.from(element.contentsContainer().qsa(':scope > div')).forEach((d,i)=>{
-if (!d.classList.contains('selected')) return;
+if (!d.classList.contains('selected') && !(range && range.intersectsNode(d))) return;
 min = Math.min(i+1, min || (i+1));
 max = Math.max(i+1, max || (i+1));
 });
@@ -6735,9 +6832,17 @@ return 'line ' + min + ' to ' + max + ' of ' + element.longName;
 },
 set selectedLine(value) {
 // for autoSelect
-if (element.matches('[autoSelect]:not([autoSelect="false" i])') && ((value=number(value)),true))
-element.contentsContainer().qsa(':scope > div').forEach
+//debugger;
+if (element.matches('[autoSelect]:not([autoSelect="false" i])')) {
+value=number(value);
+Array.from(element.contentsContainer().qsa(':scope > div')).forEach
 ((d,i,a)=>d.classList.toggle('selected', (i==value-1) || (i===a.length-1 && value>a.length)));
+}
+else {
+value = parseInt(value);
+var div = element.contentsContainer().qsa(':scope > div')[value-1];
+if (div) getSelection().selectAllChildren(div);
+}
 }
 };
 }
@@ -6755,18 +6860,26 @@ line-break: after-white-space;
 --fld-border: none;
 --font: var(--stack-field-font, inherit);
 position: relative;
+border: var(--fld-border, 1px solid transparent);
+box-sizing: border-box;
+--part-outline: 1px solid transparent;
+outline: var(--part-outline); outline-offset: -1px;
 
-background: var(--special-field-tool-background, var(--background, white)) ;
+background: var(--special-field-tool-background-color-attribute, var(--color-attribute, var(--background, white)));
+/* note: this keyframe has the same 0%,100% and the animation has one step. If the browser is wasting cycles redrawing your page that's ITS fault. */
+animation: var(--hasAddColorData-inhibit-color, none) 2147483647s normal steps(1);
+
 background-size: contain;
 background-attachment: local;
 background-position: var(--special-field-tool-background-position, 0px calc(3px - 0.1em));
-border: var(--fld-border, 1px solid transparent);
-box-sizing: border-box;
-outline: none; outline-offset: -1px;
+}
+@keyframes hasAddColorData-inhibit-color {
+0%,100% { background: var(--special-field-tool-background, var(--background, white)); }
 }
 
 :host([showLines]:not([showLines="false" i])) {
 --special-field-tool-background: repeating-linear-gradient(var(--background, transparent), var(--background, transparent) calc(1.125em - 1px), #CCC 1.125em);
+--special-field-tool-background-color-attribute: repeating-linear-gradient(var(--color-attribute, var(--background, transparent)), var(--color-attribute, var(--background, transparent)) calc(1.125em - 1px), #CCC 1.125em);
 }
 :host([wideMargins="false" i]) {
 --special-field-tool-background-position: 0px calc(0px - 0.1em);
@@ -6781,14 +6894,14 @@ outline: none; outline-offset: -1px;
 :host([type="opaque" i]) { xbackground: var(--background); --plusbevel: 0px; --fld-border: 1px solid transparent;
 clip-path: inset(0px 0px);	/* workaround for another Safari draw bug */
 }
-:host([type="rectangle" i]) { xbackground: var(--background); --fld-border: 1px solid transparent; outline: 1px solid black !important; --plusbevel: 1px; }
-:host([type="shadow" i]) { xbackground: var(--background); --fld-border: 1px solid transparent; outline: 1px solid black !important; --plusbevel: 1px;
+:host([type="rectangle" i]) { xbackground: var(--background); --fld-border: 1px solid transparent; --part-outline: 1px solid black; --plusbevel: 1px; }
+:host([type="shadow" i]) { xbackground: var(--background); --fld-border: 1px solid transparent; --part-outline: 1px solid black; --plusbevel: 1px;
 box-shadow: 2px 2px 0px 0px black; }
-:host([type="scrolling" i]) { xbackground: var(--background); --plusbevel: 1px; --fld-border: 1px solid transparent; outline: 1px solid black !important; overflow: scroll; max-height: 100%; --background: white; overscroll-behavior: contain; }
+:host([type="scrolling" i]) { xbackground: var(--background); --plusbevel: 1px; --fld-border: 1px solid transparent; --part-outline: 1px solid black; overflow: scroll; max-height: 100%; --background: white; overscroll-behavior: contain; }
 
 ::slotted(div[slot]) { flex: 1; }
 
-:host div#inner { flex: 1; outline: none; }
+:host div#inner { flex: 1; outline: none; --color-attribute: transparent; }
 /* this seems to cover Chrome's need to have a container div for CE text. Otherwise it limits selection to a single div -- wrong behaviour. */
 /* turns out it's not enough for safari though, because it won't accept clicks in the empty space without contenteditable. Oh well
 /*:host(:not([lockText])) > div#inner { -webkit-user-modify: read-write; -webkit-user-select: text; }*/
@@ -6847,9 +6960,7 @@ inner.style.setProperty('--border', (element.bevel || element.color)
 inner.style.setProperty('--styledborder', (element.bevel || element.color)
 ? (Math.abs(element.bevel||0) + 'px ' + ((element.bevel < 0) ? 'inset' : 'outset') + ' ' + (element.color || ''))
 : '');
-inner.style.setProperty('--background', element.color || '');
-inner.style.setProperty('--icon-caption-background', element.color || '');
-//inner.style.setProperty('--bevel', (element.bevel||0) + 'px');
+inner.style.setProperty('--color-attribute', element.color || '');
 }
 setaddcolor();
 
@@ -6895,10 +7006,12 @@ if (isNaN(value) || !Number.isInteger(Number(value)))
 template.qs('#icon img').src = value+(/[.][A-Za-z0-9]+$/.test(value)?'':'.png');
 else
 template.qs('#icon img').src = 'png-icons/icon_'+value+'.png';
+//console.log(template.qs('#icon img').src);
 template.qs('#icon img').dataset.fullsize = 'false';
 }
 }
 seticon(element.icon);
+//if (element.icon) console.log('set ' + element.icon + ' src=' + template.qs('#icon img').src);
 
 return {
 set type(value) {
@@ -6946,19 +7059,12 @@ set highlite(v) { element.hilite = v; }, set hilight(v) { element.hilite = v; },
 get sharedHilite()
 { return element.matches(`:not([sharedHilite="false" i])`); },
 connected() {
-//resizeObserver.observe(caption);
 if (element.type.toLowerCase()=='popup') {
 if (document.readyState != 'loading') fillselect();
 else document.addEventListener('DOMContentLoaded', dcl, true);
 function dcl(event)
 { document.removeEventListener('DOMContentLoaded',dcl); fillselect(); }
 }
-if (0 && element.icon) { element.icon = element.icon;// this thingy because the original load didn't know its stack and couldn't find the local icon
-/*console.log('reicon',element,sim.stackOf(element).importedICONs,sim.stackOf(element).localICONs[element.icon]); */ }
-/*if (element.has_false_innerHTML=element.matches(':empty'))
-element.innerHTML = ' ';
-*/
-// above is no good, need to insert the space after load
 },
 disconnected() { //resizeObserver.unobserve(caption);
 },
@@ -6972,6 +7078,12 @@ value = String(value);
 element.innerText = (element.has_false_innerHTML=!value) ? ' ' : value; /* needed for in-text sel */
 fillselect();
 },
+get selectedLine() {
+if (element.owner)
+return 'line ' + (select.selectedIndex+1) + ' of ' + element.longNumber;
+else
+return select.selectedIndex + 1;
+},
 set selectedLine(value) { select.selectedIndex = parseInt(value)-1; },
 get selectedText() { return select.value; },
 set selectedText(value) {
@@ -6983,16 +7095,20 @@ element.selectedLine = index+1;
 
 };
 }
-ElementTemplate.Create("button-part", "type=transparent,hilite=false,autoHilite=true,sharedHilite=true,family='',showName=true,enabled=true,icon=0,selectedLine=0", "button-or-field-template",`<section id="section"><slot></slot></section><label id="inner" for="#"><input type="checkbox"><div id="icon"><img draggable="false"></div><div id="caption"></div><select></select></label><style>
+ElementTemplate.Create("button-part", "type=transparent,hilite|highlight|highlite|hilight=false,autoHilite=true,sharedHilite=true,family='',showName=true,enabled=true,icon=0,selectedLine=0", "button-or-field-template",`<section id="section"><slot></slot></section><label id="inner" for="#"><input type="checkbox"><div id="icon"><img draggable="false"></div><div id="caption"></div><select></select></label><style>
 :host {
 position: relative; display: inline-block; overflow: hidden; box-sizing: border-box;
 vertical-align: middle;
---font: var(--stack-button-font, bold 1em system-ui);
+--default-font: bold 1em system-ui;
+--font: var(--stack-button-font, var(--default-font));
 --width: auto; --height: auto; --inner-inset: 0px;
 -webkit-user-select: none; user-select: none; -webkit-user-modify: none; user-modify: none;
-outline: none; outline-offset: -1px;
+--part-outline: 1px solid transparent;
+outline: var(--part-outline); outline-offset: -1px;
+/*outline: none; outline-offset: -1px;*/
 }
 :host * { pointer-events: var(--context-menu-none); }	/* make shadow invisible to context events */
+:host([textFont]:not([textFont=""])) { --default-font: inherit; }
 
 :host #section {
 /* this needs to be here for innerText to work...*/
@@ -7015,8 +7131,14 @@ backdrop-filter: invert(100%) brightness(33%) invert(100%);
 :host([enabled="false" i]) { --border: gray; x-webkit-filter: invert(100%) brightness(70%) invert(100%); }
 :host([enabled="false" i]) #inner *:not(input) { opacity: 0.5; }
 
-:host(:not([autoHilite="false" i]):not([enabled="false" i]):hover:active), :host([hilite]:not([hilite="false" i]))
-{ --active-background: black; --active-color: var(--background); --active-img-filter: invert(100%); --active-value-none: none; --icon-caption-background: inherit; }
+:host(:not([autoHilite="false" i]):not([enabled="false" i]):hover:active),
+:host([hilite]:not([hilite="false" i])) {
+--active-background: black; --active-color: var(--background); --active-img-filter: invert(100%); --active-value-none: none; --icon-caption-background: inherit;
+}
+:host(:not([autoHilite="false" i]):not([enabled="false" i]):not([type="checkbox" i]):not([type="radiobutton" i]):hover:active),
+:host([hilite]:not([hilite="false" i]):not([type="checkbox" i]):not([type="radiobutton" i])) {
+--hasAddColorData-inhibit-color: none;	/* just during the hilite should be fine */
+}
 
 :host(:not([type]):not([autoHilite="false" i]):not([enabled="false" i]):active:hover),
 :host(:not([type])[hilite]:not([hilite="false" i])),
@@ -7032,25 +7154,40 @@ backdrop-filter: var(--inversion-backdrop-filter);
 :host([type="popup" i]:not([autoHilite="false" i]):not([enabled="false" i]):active:hover), :host([type="popup" i][hilite]:not([hilite="false" i]))
 { --active-color: white; }
 
+@keyframes hasAddColorData-inhibit-color {
+/* Safari problem: when --active-background changes, the animation doesn't notice. I think we can fix this temporarily by zeroing out the animation during hilite */
+/* we're doing all this, by the way, so that the card can set a CSS variable that will inhibit --color-attribute. Isn't there a better way?? */
+0%,100% { background: var(--special-background-filter, var(--active-background, var(--background))); }
+}
+
 :host(:not([type])) #inner, :host([type="transparent" i]) #inner, :host([type="opaque" i]) #inner, :host([type="rectangle" i]) #inner, :host([type="roundrect" i]) #inner, :host([type="shadow" i]) #inner, :host([type="standard" i]) #inner, :host([type="default" i]) #inner, :host([type="oval" i]) #inner, :host([type="popup" i]) #icon
 {
-background: var(--special-background-filter, var(--active-background, var(--background)));
+background: var(--special-background-filter, var(--active-background, var(--color-attribute, var(--background))));
+/* note: this keyframe has the same 0%,100% and the animation has one step. If the browser is wasting cycles redrawing your page that's ITS fault. */
+animation: var(--hasAddColorData-inhibit-color, none) 2147483647s normal steps(1);
+
 color: var(--active-color, var(--color));
 border: var(--border);
 }
 :host([type="popup" i]) #inner
 {
-background: var(--background);
+background: var(--color-attribute, var(--background));
+animation: var(--hasAddColorData-inhibit-color, none) 2147483647s normal steps(1);
+
 color: var(--color);
 border: var(--border);
 }
 :host([type="popup" i]) #caption
 {
-background: var(--active-background, none);
+background: var(--active-background, var(--color-attribute, none));
+animation: var(--hasAddColorData-inhibit-color, none) 2147483647s normal steps(1);
+
 color: var(--active-color, var(--color));
 }
 :host([type="checkbox" i]) #inner, :host([type="radiobutton" i]) #inner {
-background: var(--background);
+background: var(--color-attribute, var(--background));
+--active-background: transparent;
+animation: var(--hasAddColorData-inhibit-color, none) 2147483647s normal steps(1);
 --override-img-filter: none;
 }
 
@@ -7063,22 +7200,28 @@ background: var(--background);
 :host([type="rectangle" i]) { border: thin solid var(--border); }
 :host([type="roundrect" i]) { border: thin solid var(--border); border-radius: 10px; box-shadow: 1px 1px 0px var(--border); }
 :host([type="shadow" i]) { border: thin solid var(--border); box-shadow: 1px 1px 0px var(--border); }
-:host([type="standard" i]) { border: thin solid var(--border); border-radius: 8px; }
+/* there is a Safari bug that misclips the roundrect on the right leaving a white spot; this (3/16)px and absolutely no less inset boxshadow untriggers the bug */
+:host([type="standard" i]) { border: thin solid var(--border); border-radius: 8px; box-shadow: inset 0px 0px 0px 0.1875px black; }
 :host([type="default" i]) { border: 3px solid var(--border); border-radius: 10px; padding: 1px; }
 :host([type="default" i]) #inner { border: var(--styledborder, thin solid var(--border)); border-radius: 6px; xpadding: 0.25em; }
 :host([type="oval" i]) { border-radius: 47.5%; }
 
 :host([type="default" i]) #inner, :host([type="standard" i]) #inner, :host([type="roundrect" i]) #inner { --inner-inset: 1px; }
 
-:host #inner { flex: 1; box-sizing: border-box; display: flex; place-items: center; justify-content: space-around; align-items: center; position: relative; cursor: inherit; overflow: hidden; height: 100%; }
+:host #inner { flex: 1; box-sizing: border-box; display: flex; place-items: center; justify-content: space-around; align-items: center; position: relative; cursor: inherit; overflow: hidden; }
+:host(:not([height]):not([type="Default" i])) #inner { height: 100%; }
+:host(:not([width]):not([type="Default" i])) #inner { xwidth: 100%; }
+
 :host(:not([width]):not([type="checkbox" i]):not([type="radiobutton" i])) #inner { white-space: pre; padding: 4px; }
 :host([width]:not([type="radiobutton" i]):not([type="checkbox" i]):not([type="popup" i])) #inner { flex-wrap: wrap; }
 x:host([topLeft]) #inner { position: absolute; left: var(--inner-inset); top: var(--inner-inset); right: var(--inner-inset); bottom: var(--inner-inset); overflow: hidden; }
 :host([width]) #inner { position: absolute; left: var(--inner-inset); right: var(--inner-inset); }
 :host([height]) #inner { position: absolute; top: var(--inner-inset); bottom: var(--inner-inset); }
 
-:host([type="roundrect" i]) #inner { margin: -1px; border-radius: 9px; }
-:host([type="standard" i]) #inner { margin: -1px; border-radius: 7px; }
+:host([type="roundrect" i]) #inner { xmargin: -1px; border-radius: 9px; }
+:host([type="standard" i]) #inner { xmargin: -1px; border-radius: 7px; }
+:host([width][type="roundrect" i]) #inner, :host([width][type="standard" i]) #inner { margin: -1px; }
+
 :host([type="oval" i]) #inner { border-radius: 47.5%; }
 
 :host([type="default" i]) #inner { xborder-radius: 10px; }
@@ -7137,6 +7280,657 @@ background-position: right .7em top 50%;
 background-size: 10px auto;
 }
 </style>`);
+
+
+function title_bar_menu(element,template)
+{
+var to, div = template.qs('div'), span = template.qs('span');
+
+span.onpointerdown = ()=>{ template.qs('div').style.display = ''; element.show = !boolean(element.show); }
+span.onmouseleave = ()=>{ clearTimeout(to); element.show = false; }
+div.onmoveleave = ()=>{ div.style.display = ''; }
+div.onpointerdown = (event)=>{
+element.show = false;
+clearTimeout(to); to = setTimeout(()=>div.style.display = 'none', 250);
+event.preventDefault();
+var menuItem = event.target.closest('title-bar-menuitem');
+if (menuItem)
+menuItem.dispatchEvent(new CustomEvent('title-bar-domenu', { bubbles: true, composed: true, detail: menuItem }));
+};
+
+return {
+set name(value) {
+span.innerText = value + ' ▼';
+},
+
+set longName(value) { element.name = value; },
+get longName() { return element.name },
+
+set contents(value) {
+// seems like you can use commas or returns in HC
+element.innerHTML = String(value).split(/[,\n]/).map((i)=>"<title-bar-menuitem>"+ContentEditableFix.HTMLEncode(i)+"</title-bar-menuitem>").join('');
+},
+get contents()
+{ return Array.from(element.qsa('title-bar-menuitem')).map((tbmi)=>tbmi.contents).join('\n'); },
+
+set menuMessages(value) {
+var mm = String(value).split(/[,\n]/);
+Array.from(element.qsa('title-bar-menuitem')).forEach((tbmi,i)=>tbmi.menuMessage = mm[i] || '');
+},
+get menuMessages() {
+Array.from(element.qsa('title-bar-menuitem')).map((tbmi)=>tbmi.menuMessage || '').join('\n');
+}
+};
+}
+ElementTemplate.Create("title-bar-menu", "name,show=false", "",`
+<div><slot></slot></div>
+<span style="">Menu ▼</span>
+<style>
+:host { display: inline-block; position: relative; user-select: none; -webkit-user-select: none;
+font: 12px Chicago; text-align: left; position: relative; box-sizing: border-box; xoutline: thin dotted red;
+border: thin solid black; border-radius: 2px; box-shadow: 1px 1px 1px gray; }
+:host > span { display: inline-block; xoutline: thin dotted green; padding: 1px 4px; }
+:host > div { display: none; position:absolute; top: calc(100% - 1px); background: white; border: 1px solid black; box-shadow: 0px 0px 3px gray; white-space: nowrap; z-index: 1; transform: translate3d(0,0,0); }
+:host > div > div { padding: 4px 1em; }
+:host([show="true" i]) > span, :host > div > div:hover { background: black; color: white; }
+:host([show="true" i]) > div, :host > div:hover { display: initial; }
+</style>
+`);
+
+
+function title_bar_menuitem(element,template)
+{
+return {
+set contents(value)
+{ element.innerText = String(value).split('\n')[0]; },
+get contents()
+{ return element.innerText; },
+set name(value)
+{ element.contents = value; },
+get name()
+{ return element.innerText; },
+set longName(value)
+{ element.name = value; },
+get longName()
+{ return element.name },
+set markChar(value)
+{ template.qs('#markChar').innerText = String(value)[0] || ' '; },
+get markChar()
+{ return template.qs('#markChar').innerText.trim(); },
+set checkMark(value)
+{ template.qs('#markChar').innerText = boolean(value) ? '√' : ' '; },
+get checkMark()
+{ return template.qs('#markChar').innerText=='√'; }
+/*set menuMsg(value)
+{ element.menuMessage = value; },
+get menuMsg()
+{ return element.menuMessage; }*/
+};
+}
+ElementTemplate.Create("title-bar-menuitem", "contents,markChar,menuMessage|menuMsg", "",`
+<span id="markChar" style="min-width: 1em;">&nbsp;</span>
+<slot></slot>
+<style>
+:host { padding: 4px 1em 4px 0.5em; display: block; }
+:host(:hover) { background: black; color: white; }
+</style>
+`);
+
+document.write('<style>' + `
+.flex-row { display: flex; flex-direction: row; align-items: baseline; }
+.flex-column { display: flex; flex-direction: column; }
+.flex-expand { flex: 1; flex-basis: auto; }
+` + '</style>');"use strict";
+var oldscroll;
+var modal_dialogs_that_are_visible = [];	// only :not(.static)
+
+window.addEventListener('keydown', (event)=>{
+if (!window.has_own_offer_modal_dialog_keydown_event)
+offer_modal_dialog_keydown_event(event);
+}, true);
+function offer_modal_dialog_keydown_event(event)
+{
+if (event.key=='Enter' || event.key=='Escape')
+{
+var lou = event.target.closest('modal-dialog.loading.offer-update');
+if (lou) {
+var btn = lou.shadowRoot.qs((event.key=='Enter') ? '.answer .reload' : '.answer .cancel');
+btn.hilite = true; setTimeout(()=>{ btn.hilite = false; btn.click(); }, 100);
+event.stopPropagation(); event.preventDefault(); return false;
+}
+
+var btn, sel = (event.key=='Enter')
+? 'button-part[type="default" i]'
+: 'button-part[name="Cancel" i], input[value="Cancel" i]';
+var d = Array.from(modal_dialogs_that_are_visible).reverse().find((d)=>d.matches('modal-dialog[visible]:not([visible=false])'));
+
+if (d && (btn=d.qs(sel))) {
+//console.log(btn);
+if ((!btn.classList.contains('ignore-keys') && !document.activeElement.closest('.ignore-keys')) || event.metaKey) {
+btn.hilite = true; setTimeout(()=>{ btn.hilite = false; btn.click(); }, 100);
+event.stopPropagation(); event.preventDefault(); return false;
+}
+}
+
+if (event.key=='Escape' && !sim.stack.selectedPart && floatmenu.classList.contains('leaveopen')) {
+floatmenu.classList.toggle('leaveclosed', !floatmenu.classList.toggle('leaveopen')); event.preventDefault(); event.stopPropagation();
+return false; }
+}
+}
+function modalresizer(md)
+{
+var windowInnerHeight = (window.windowheight || window).offsetHeight; // window.innerHeight;
+
+var size = [window.innerWidth, windowInnerHeight], fullscreen = body.classList.contains('fullscreen');
+
+mutableStyle('--overlay-height', window.visualViewport.height + 'px');
+
+/*if (!body.qs('modal-dialog[visible=true]:not(.static)'))
+{
+}
+else*/ if (fullscreen) {
+mutableStyle('--overlay-height', null);
+mutableStyle('--overlay-translate-y', null);
+}
+else if (window.visualViewport /*&& modal_dialogs_that_are_visible.length*/) {
+if (oldscroll)
+{ document.scrollingElement.scrollTop = oldscroll.value; oldscroll = null; }
+
+mutableStyle('--overlay-top', (document.scrollingElement.scrollTop-visualViewport.top) + 'px');
+mutableStyle('--overlay-bottom-size', windowInnerHeight-window.visualViewport.height + 'px');
+
+size = [window.visualViewport.width*visualViewport.scale,window.visualViewport.height*visualViewport.scale/*-(fullscreen?0:20)*/];	// height -20 needed for ipad but not for phone...grr
+//console.log(size);
+/*mutableStyle('--overlay-height', size[1] + 'px');
+mutableStyle('--overlay-translate-y', size[1] - (fullscreen ? 0 : window.innerHeight) + 'px');*/
+}
+
+if (modal_dialogs_that_are_visible.length)
+(md ? [md] : Array.from(body.qsa('modal-dialog'))).filter((md)=>md.matches(":not(.static)")).forEach((md)=>{
+var xshrink = Math.min(1, size[0]/(md.shadowRoot.qs('#dialog').offsetWidth+6));
+var yshrink = Math.min(1, size[1]/(md.shadowRoot.qs('#dialog').offsetHeight+6));
+var s = fullscreen ? 1 : Math.min(/*(xshrink < 0.5) ? 1 :*/ xshrink, (yshrink < 0.7) ? 1 : yshrink);
+md.style.setProperty('--scale', (s!=1) ? s : '');
+//md.shadowRoot.qs('#dialog').style.transformOrigin = 'top center';
+md.style.setProperty('--transform', (s!=1) ? 'scale('+s+')' : '');
+});
+
+if (window.stackcontainer)
+{
+window.stackcontainer.scrollTop = 0;
+size = [stackcontainer.offsetWidth -(fullscreen?2:6),
+
+(windowInnerHeight*visualViewport.scale - stackcontainertd.offsetTop) /*+window.scrollY*/
+/*
+Math.round(window.innerHeight*visualViewport.scale)
+- (fullscreen ? 0 : stackcontainer.offsetTop) */
+- 3
+/*+ window.scrollY*/	// this is to compensate for window.innerHeight shrinking when the ipad keyboard shows
+/*- (fullscreen ? copyright.offsetHeight+10 : 0)*/];
+//console.log(size);
+var stackzoom = 1;
+Array.from(stackcontainer.qsa('modal-dialog')).forEach((md)=>{
+//md.classList.toggle('static', !fullscreen);
+// we need a centering thing for full screen
+var xgrow = size[0]/(md.shadowRoot.qs('#dialog').offsetWidth+1);
+var ygrow = size[1]/(md.shadowRoot.qs('#dialog').offsetHeight+3);
+var s = Math.min(xgrow , ygrow); //console.log(s);
+
+// if we're gonna fill the screen i think the screen needs the same s for everything. but oh well
+/*if (s > 1 && !body.classList.contains('fullscreen') && matchMedia('(pointer:fine)').matches)
+s = 1;*/
+if (s > 1 && matchMedia('(pointer:fine)').matches && !fullscreen)
+s = 1;
+else if (s > 1 && !fullscreen)
+s = Math.floor(s*4)/4;
+
+//	if (s > 1 && (!fullscreen || md.classList.contains('inactive')))
+//		s=1;//s = Math.min(Math.floor(Math.sqrt(s)*8)/8, 1.5);
+
+md.style.setProperty('--scale', (s!=1) ? s : '');
+md.style.setProperty('--transform',
+((!fullscreen ? '' : 'translate(' + Math.floor((size[0]-md.shadowRoot.qs('#dialog').offsetWidth*s)/2) +'px, 0px)'))
++ ((s!=1) ? ' scale('+s+') ' : ''));
+stackzoom = Math.min(2,s);
+});
+
+/*if (typeof answerdialog != 'undefined' && stackzoom>1)
+answerdialog.style.setProperty('--transform', (stackzoom>1) ? 'scale('+stackzoom+')' : '');
+if (typeof askdialog != 'undefined' && stackzoom>1)
+askdialog.style.setProperty('--transform', (stackzoom>1) ? 'scale('+stackzoom+')' : '');*/
+/*if (window.answerdialog && stackzoom>1)
+answerdialog.style.setProperty('--transform', (stackzoom>1) ? 'scale('+stackzoom+')' : '');
+if (window.askdialog && stackzoom>1)
+askdialog.style.setProperty('--transform', (stackzoom>1) ? 'scale('+stackzoom+')' : '');*/
+
+if (window.stackcontainer_windowmoved)
+stackcontainer_windowmoved();
+}
+}
+window.addEventListener('resize', (event)=>modalresizer());
+window.addEventListener('scroll', (event)=>modalresizer());
+window.addEventListener('orientationchange', (event)=>modalresizer());
+if (window.visualViewport) window.visualViewport.addEventListener('resize', (event)=>modalresizer(), {passive:true});
+if (window.visualViewport) window.visualViewport.addEventListener('scroll', (event)=>modalresizer(), {passive:true});
+
+var ever_waited_on_coarse = false;
+function modal_dialog(element,template)
+{
+var titlebar = template.qs('#titlebar'), dialog = template.qs('#dialog');
+
+new ResizeObserver(entries => requestAnimationFrame(() => { modalresizer(element); })).observe(dialog);
+
+template.qs('#closebox').addEventListener('click', (event)=>{
+element.dispatchEvent(new Event('closebox', { bubbles: true }));
+event.preventDefault(); return event.stopPropagation();
+});
+template.qs('#zoombox').addEventListener('click', (event)=>{
+element.dispatchEvent(new Event('zoombox', { bubbles: true }));
+event.preventDefault(); return event.stopPropagation();
+});
+element.addEventListener('pointerdown', (event)=>{
+if (event.composedPath()[0]===element)
+{ event.preventDefault(); event.stopPropagation(); /*perform_system_beep();*/ return; }	// don't mess with the selection
+});
+titlebar.addEventListener('pointerdown', (event)=>{
+if (!titlebar.contains(event.composedPath()[0]) || event.composedPath()[0].matches('#zoombox,#closebox')/*===template.qs('#closebox')*/) return;
+if (element.matches('body.fullscreen #stackcontainer modal-dialog, modal-dialog.nodrag'))
+{ event.preventDefault(); event.stopPropagation(); return; }
+if (element.matches('#stackcontainer > modal-dialog') && !body.classList.contains('command')) top_stackList(element);
+// when .ybottom, style.bottom moves, not top, so we get the offset from the bottom
+var clickloc = [event.clientX - element.x,
+element.classList.contains('ybottom') ? (element.y - (element.parentNode.getBoundingClientRect().bottom - event.clientY)) : (event.clientY - element.y)]; //console.log(clickloc);
+follow_mouse(event, move,
+(event,start)=>{
+element.classList.toggle('dragging', start);
+if (!start) element.dispatchEvent(new Event('windowmoved', { bubbles: true })); else return true; } );
+function move(event)
+{
+requestAnimationFrame(()=>{
+// reealllly needs to be 'dont escape container'
+element.x = Math.max(event.clientX - clickloc[0], element.classList.contains('positivexy')?0:-999999);
+// if we know the offset from the bottom, and it is as far from the parent as
+element.y = element.classList.contains('ybottom')
+? (element.parentNode.getBoundingClientRect().bottom - event.clientY + clickloc[1])
+: Math.max((event.clientY - clickloc[1]), element.classList.contains('positivexy')?0:-999999);
+element.dispatchEvent(new Event('windowmoved', { bubbles: true }));
+});
+}
+event.preventDefault(); event.stopPropagation();
+},true);
+
+element.tabIndex = 0;
+return {
+set name(value) { template.qs('#titlebar span').dataset.name = value; },
+set x(value) { template.qs('#dialog').style.setProperty('--x',value+'px'); },
+set y(value) { template.qs('#dialog').style.setProperty('--y',value+'px'); },
+get x() { return parseInt(element.getAttribute('x')) || 0; },
+get y() { return parseInt(element.getAttribute('y')) || 0; },
+set visible(value) {
+oldscroll = { value: document.scrollingElement.scrollTop };
+if (matchMedia('(pointer:coarse)').matches	// let keyboard come up before placement, on touchscreens
+&& (element.contains(document.activeElement) && element!==document.activeElement)
+&& !element.classList.contains('static') /*&& !ever_waited_on_coarse*/ && visualViewport.height == window.innerHeight)
+{
+element.style.opacity = '0';
+setTimeout(()=>{ element.style.opacity = ''; }, 600);
+ever_waited_on_coarse = true;
+//console.log(document.activeElement, element.contains(document.activeElement));
+}
+else
+setTimeout(()=>{modalresizer(element);},1);
+
+if (boolean(value) && !element.classList.contains('static')) {
+if (!modal_dialogs_that_are_visible.includes(element))
+modal_dialogs_that_are_visible.push(element);
+if (!matchMedia('(pointer:coarse)').matches)
+element.focus();
+}
+else {
+modal_dialogs_that_are_visible = modal_dialogs_that_are_visible.filter((m)=>(m!==element));
+if (element.contains(ContentEditableFix.ActiveElement()))
+ContentEditableFix.ActiveElement().blur();
+}
+},
+get visible() {
+return !!(element.getAttribute('visible') && element.getAttribute('visible') !='false');
+},
+cardWindowDelegate() {
+if (!element.card_window_delegate) {
+element.card_window_delegate = document.createElement('card-window-delegate');
+element.card_window_delegate.connectToDialog(element);
+}
+return element.card_window_delegate;
+},
+get menubar()
+{ return template.qs('#menubar'); },
+getMenu(name,createIfMissing,complainIfExisting) {
+var tbm = element.menubar.qs('title-bar-menu[name="'+name+'" i]');
+if (!tbm && createIfMissing) {
+tbm = document.createElement('title-bar-menu');
+tbm.name=name;
+element.menubar.appendChild(tbm);
+}
+else if (tbm && complainIfExisting) {
+console.log("Menu " + name + " already exists");
+}
+return tbm;
+},
+deleteMenu(name, complainIfMissing) {
+var tbm = element.menubar.qs('title-bar-menu[name="'+name+'" i]');
+if (tbm)
+element.menubar.removeChild(tbm);
+else if (complainIfMissing)
+console.log("Can't find menu " + name);
+}
+};
+}
+ElementTemplate.Create("modal-dialog", "name,visible,x,y", "",`<div id="dialog"><div id="titlebar"><div class="boxmargin left" style="flex: 0 1 2em;"><div id="closebox"></div></div><div style="background-position: top right;"></div><span id="title" style="position: relative;"></span><span id="flashmessage" style="color: green;"></span><span id="menubar" style="margin-top: -2px;"></span><div> </div><div class="boxmargin right" style="flex: 0 1 2em; "><div id="zoombox"></div></div></div><div id="content"><span id="cover" onpointerdown="if (typeof sim != 'undefined') sim.mouse='down';" onpointerup="if (typeof sim != 'undefined') sim.mouse='up';"><div class="answer"><button-part type="standard" visible="false" name="Extrabutton" onclick=""></button-part><button-part class="reload" type="default" name="Reload ↺" onclick="this.getRootNode().host.performUpdateReload(); this.getRootNode().host.classList.remove('loading','offer-update');"></button-part> <button-part type="standard" class="cancel" name="Cancel" onclick="this.getRootNode().host.classList.remove('loading','offer-update');"></button-part> </div></span><slot></slot><!--div style="clear:both;"></div!--></div></div><style>
+
+:host #flashmessage { width: fit-content; font: caption; padding-right: 4px; xtransition: opacity 0.15s; }
+:host #flashmessage:empty { xwidth: 0px; xpadding: 0px; opacity: 0; display: none; }
+
+:host {
+cursor: default;
+font: var(--modal-dialog-font, bold 1em system-ui);
+outline: none;
+--x: 0px; --y: 0px; --transform: ;
+--dialog-border: #444;
+pointer-events: none;
+position: relative;
+overscroll-behavior: contain;
+}
+:host(.dotted) {
+//font: var(--modal-dialog-font, caption);
+}
+:host(.static) {
+visibility: hidden;
+pointer-events: none;
+font: var(--modal-dialog-font, inherit);
+}
+:host(:not(.static)) {
+position: var(--modal-dialog-modal-absolute, fixed);
+left: 0px; right: 0px; top: var(--overlay-top, 0px); height: min(100%, 100vh);
+z-index: 100;
+box-sizing: border-box; xborder: 10px solid gray;
+display: none;
+}
+:host(:not(.static):not(.dotted)) {
+backdrop-filter: blur(1px);
+-webkit-overscroll-behavior: none; overscroll-behavior: none;
+background: #8884;
+pointer-events: auto;
+xtransition: border-bottom 0.1s;
+border-bottom: var(--overlay-bottom-size, 0px) solid transparent;
+}
+@media(prefers-color-scheme: dark) {
+:host(:not(.static):not(.dotted))) { backdrop-filter: none; /* safari issue */ }
+}
+:host([visible]:not([visible="false" i])) {
+display: block;
+visibility: visible;
+}
+:host(:not([visible]:not([visible="false" i]))) #dialog slot {
+display: none;
+}
+
+:host(:not(.loading):not(.inactive):not(.waiting)) #cover
+{ display: none; }
+:host #cover
+{ position: absolute; z-index: 1; left: 0; right: 0; top: 0; bottom: 0; background: #FFF4; display: grid; place-items: center; }
+:host(.waiting) #cover { background: transparent; }
+:host #cover:after
+{ content: " "; }
+:host(:not(.loading):not(.waiting)) #cover > .answer
+{ display: none; }
+
+:host(.loading:not(.offer-update)) #cover { background: white; }
+
+:host(.loading) #cover > .answer {
+background: white; padding: 0.5em 1em; border-radius: 0.5em; border: thin solid gray;
+font: caption; text-align: center; color: gray;
+}
+@keyframes flicker-animation {
+0%   { opacity:0; }
+50%  { opacity:0.3; }
+100% { opacity:0; }
+}
+:host(.loading) #cover .answer:before
+{ content: "Opening..."; opacity: 1;  }
+
+:host(.waiting) #cover  {
+opacity: 1;
+xcursor: url(ui-icons/watch.png) 8 8, default; 	/* would be nice to delay the watch a little while somehow */
+cursor: url(ui-icons/cursor.png) 6 0, default;
+}
+:host(.waiting) #cover > .answer {
+animation: flicker-animation 1s 2s infinite;
+background: white; padding: 0.5em 1em; border-radius: 0.5em;  border-radius: 0.5em; border: thin solid gray;
+font: caption; text-align: center; opacity: 0;
+}
+:host(.waiting) #cover .answer:before
+{ content: "Wait... (⌘ .)"; }	/* should change this to fluid [data-wait-message] or something. = wait 3 seconds, Loading..., etc */
+
+:host(.loading.offer-update) #cover > .answer {
+xbox-shadow: 0px 0px 4px gray;
+}
+:host(.loading.offer-update) #cover .answer:before
+{ content: "This stack was changed."; display: block; font: bold 1em system-ui; color: black; padding-bottom: 0.5em; text-align: left; }
+:host(:not(.offer-update)) #cover .answer button-part
+{ display: none; }
+
+:host #dialog {
+position: relative;
+display: inline-block;
+transform-origin: top left;
+transform: var(--transform);
+pointer-events: var(--context-menu-none, auto);
+overflow: hidden; /* This seems to trigger an xor drawing bug in safari */
+}
+:host(.block) #dialog {
+display: block; width: 100%;
+}
+:host(:not(.frameless)) #dialog {
+background: var(--dark-mode-softwhite, white);
+border: thin solid var(--dialog-border);
+xborder-radius: 2px 2px 0px 0px;
+}
+:host(:not(.static)) #dialog {
+position: absolute; left: calc(50% + var(--x)); top: calc(50% + var(--y));
+transform: var(--transform) translate(-50%,-50%) ;
+box-shadow: 0px 0px 3px #444;
+}
+:host(.notcentered:not(.static)) #dialog {
+position: absolute; left: calc(60px + var(--x)); top: calc(60px + var(--y));
+transform: var(--transform);
+box-shadow: 0px 0px 4px #444;
+}
+
+@media (pointer: coarse) {
+:host(:not(.static)) #dialog:focus-within {
+top: calc(0px + var(--y));
+transform: var(--transform) translate(-50%,0%);
+}
+}
+:host(.static) #dialog {
+pointer-events: var(--context-menu-none, auto);
+left: var(--override-xy-zero, var(--x)); top: var(--override-xy-zero, var(--y));
+box-shadow: 1px 2px 2px #EEE;
+}
+:host(.current.static) #dialog {
+box-shadow: 1px 1px 6px #CCC;
+}
+:host(.ybottom) #dialog {
+position: absolute;
+top: auto;
+bottom: var(--override-xy-zero, var(--y));
+}
+:host(.vertical-layout) #dialog {
+display: flex;
+xflex-direction: column;
+}
+:host(:not([name])) #titlebar {
+display: none;
+}
+#titlebar {
+text-align: center;
+display: flex; padding: 3px 2px 2px 2px;
+font: var(--modal-dialog-titlebar-font, bold 1em system-ui);
+touch-action: none; min-height: 1em;
+xborder: thick solid purple;
+}
+@media (pointer: coarse) {
+:host(.dotted[name]:not([name=""])) #titlebar { font-size: var(--modal-dialog-titlebar-boost, 1em); }
+}
+:host(.inactive) #titlebar { color: #555; }
+:host(.frameless) #titlebar {
+background: white;
+border: thin solid currentColor;
+border-bottom: thin solid #AAA8;
+}
+:host(:not(.frameless)) #titlebar {
+xpadding: 4px 4px 0px 4px;
+padding: 3px 3px 0px 3px;
+xpadding-bottom: 0px;
+xpadding-top: 4px;
+}
+:host(.nopadding) #titlebar {
+border-bottom: thin solid var(--dialog-border);
+padding-bottom: 2px;
+}
+:host #titlebar > div {
+flex: 1;
+xpadding-bottom: 2px;
+}
+:host(:not(.frameless)) #titlebar > div {
+flex: 1;
+padding-bottom: 1px;
+}
+:host(:not(.inactive)) #titlebar > div {
+background: linear-gradient(to bottom, black 0%, gray 33.33%, transparent 40%, transparent 100%);
+background-size: 100% 3px;
+background-clip: content-box;
+/*background: linear-gradient(to bottom, #444 0%, #444 50%, transparent 50%, transparent 100%);
+background-size: 100% 2.5px;
+margin-bottom: -1px;*/
+}
+:host(.dotted:not(.inactive)) #titlebar > div {
+background-image: radial-gradient(#669 0.75px, #BBB2 0);
+background-size: 4px 4px;
+xopacity: 0;
+}
+:host(.dotted) #titlebar {
+padding: 2px;
+}
+:host/*(:not(.dotted))*/ #titlebar {
+margin-top: 1px;
+}
+:host(.closebox) #closebox, :host #zoombox {
+display: inline-block; width: 1em; height: 1em; border: 1px solid currentColor; background: white; vertical-align: top;
+outline: 2px solid white; box-sizing: border-box; position: relative;
+}
+:host #zoombox:before {
+position: absolute; content: ""; left: -1px; top: -1px; width: 0.6em; height: 0.6em; border: 1px solid currentColor; box-sizing: border-box;
+}
+:host #zoombox:active:hover:before {
+left: -2px; top: -2px; border-width: 2px; width: calc(0.6em + 0.5px); height: calc(0.6em + 0.5px);
+}
+
+:host #closebox:after, :host #zoombox:after {
+position: absolute; content: ""; left: -4px; top: -4px; right: -4px; bottom: -4px; border-radius: 4px; box-sizing: border-box;
+}
+/*:host #titlebar:hover #closebox { box-shadow: inset 0px 0px 3px red; }
+:host #titlebar:hover #zoombox { box-shadow: inset 0px 0px 4px green; }*/
+:host #closebox:active:hover, :host #zoombox:active:hover {
+border: 2px solid currentColor;
+}
+@media(pointer: coarse) {
+:host #closebox:after, :host #zoombox:after
+{ left: -10px; top: -10px; right: -10px; bottom: -10px; }
+:host #closebox:active:after, :host #zoombox:active:after
+{ background: #4444; }
+}
+
+:host(.inactive) #titlebar .boxmargin {
+visibility: hidden;
+}
+:host(:not(.closebox)) #titlebar .boxmargin.left,
+:host(:not(.zoombox)) #titlebar .boxmargin.right {
+display: none;
+}
+:host(.inactive) #titlebar .boxmargin {
+pointer-events: none;
+}
+:host #titlebar > #title {
+display: inline-block; pointer-events: none;
+background: inherit;
+}
+:host #titlebar > #title[data-name=""] { display: none; }
+:host #titlebar > #title:after {
+display: inline-block;
+content: '\\A0\\A0' attr(data-name) '\\A0\\A0';
+xfont: caption;
+}
+/* i tired of userbubble */
+/*:host(.userbubble) #titlebar > #title {
+
+border: 1px dotted #BBB; background: #BBB4; padding: 1px 3px; margin: -1px 1px;
+border-radius: 2px 0.5em 2px 2px ;
+}
+:host(.userbubble) #titlebar > #title:after {
+xcontent: '\\A0🌐\\A0' attr(data-name) '\\A0';
+content: '\\A0' attr(data-name) '\\A0';
+max-height: 1em; line-height: 1;
+}*/
+
+:host #content {
+position: relative;
+pointer-events: auto;
+clip-path: inset(0px 0px);
+xoverflow: auto;
+}
+:host(:not(.nopadding):not(.frameless)) #content {
+padding: 0.5em;
+margin: 3px 2px 2px 2px;
+border: 2px solid black;
+}
+:host(.nopadding) #content {
+padding: 0px;
+}
+</style>`);
+
+
+// 'the card window' has simple properties
+function card_window_delegate(element,template)
+{
+var md;
+return {
+connectToDialog(value) { md = value; },
+get name() { return md.name; },
+get shortName() { return md.name; },
+get longName() { return md.name; },
+get rectangle() { return [0,0, element.width, element.height]; },
+set rectangle(value) {
+var r = rectangle(value);
+md.shadowRoot.qs('#content').style.overflow = 'hidden';
+element.width = r[2] - r[0];
+element.height = r[3] - r[1];
+},
+get top() { return 0; },
+get left() { return 0; },
+get width() { return md.shadowRoot.qs('#content').offsetWidth; },
+set width(value) { md.shadowRoot.qs('#content').style.overflow = 'hidden'; md.shadowRoot.qs('#content').style.width = number(value)+'px'; },
+get height() { return md.shadowRoot.qs('#content').offsetHeight; },
+set height(value) { md.shadowRoot.qs('#content').style.overflow = 'hidden'; md.shadowRoot.qs('#content').style.height = number(value)+'px'; },
+get scroll() { return [md.shadowRoot.qs('#content').scrollLeft, md.shadowRoot.qs('#content').scrollTop]; },
+set scroll(value) {
+var p = point(value);
+md.shadowRoot.qs('#content').scroll({left:p[0],top:p[1],behaviour:'smooth'});
+},
+
+};
+}
+ElementTemplate.Create("card-window-delegate", "scroll,rectangle|rect,width,height", "",);
 
 document.write(`<modal-dialog id="answerdialog" tabindex="0">
 		<table><tbody><tr><td>
@@ -7203,6 +7997,19 @@ askdialog.visible=true;
 showandselectname(askdialog,true);
 }
 
+function showandselectname(md, evenOnMobile) {
+md.visible = true;
+var onMobile = ('ontouchstart' in document);
+if (evenOnMobile || !(onMobile /*&& (document.activeElement===body || !document.activeElement)*/)) {
+//console.log('sasn');
+getSelection().selectAllChildren(md.qs("#name") || md.qs("#result"));
+window.scrollTo(0,0);
+if (onMobile) {
+getSelection().collapseToEnd();
+}
+}
+}
+
 ElementTemplate.Create("packaged-answer-and-ask-boxes", "", "",);
 
 
@@ -7211,7 +8018,7 @@ function color_bevel_picker(element,template)
 return {
 get hasColor() { return template.qs('#hascolor').hilite; },
 set hasColor(value) { template.qs('#hascolor').hilite = !!value; },
-set color(value) { template.qs('#color').value = css_color_as_rgb(value || 'white'); },
+set color(value) { template.qs('#color').value = css_color_as_rgb(value || '#FFFFFF'); if (!value) element.removeAttribute('color'); },
 set bevel(value) { template.qs('#bevel').value = (value || 0); }
 };
 }
@@ -7225,7 +8032,7 @@ ElementTemplate.Create("color-bevel-picker", "hasColor,color='#FFFFFF',bevel=0,s
 <button-part id="hascolor" type="checkbox" name="Color" onclick="
 this.parentNode.qs('#color').value = css_color_as_rgb(this.hilite &amp;&amp; this.getRootNode().host.color || '#FFFFFF');
 this.parentNode.qs('#bevel').value = this.hilite ? (this.getRootNode().host.bevel||0) : ''; "></button-part>
-<input id="color" type="color" value="#FFFFFF" oninput="this.parentNode.qs('#hascolor').hilite = true; this.getRootNode().host.color = this.value;">
+<input id="color" type="color" value="#FFFFFF" onmouseup="this.parentNode.qs('#hascolor').hilite = true; this.getRootNode().host.color = this.value;" oninput="this.parentNode.qs('#hascolor').hilite = true; this.getRootNode().host.color = this.value;">
 <input id="bevel" type="number" min="-7" max="7" value="" style="max-width: 3em;" oninput="this.parentNode.qs('#hascolor').hilite = true; this.getRootNode().host.bevel = this.value"><br>
 <style>
 :host([showBevel="false" i]) #bevel { display: none; }
