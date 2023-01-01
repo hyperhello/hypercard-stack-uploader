@@ -52,7 +52,7 @@ $RESOURCEDASM_INSTALLATION_EXECUTABLE = null;
 /* path to snd2wav if you want to import type 2 SND resource files and don't have resource_dasm */
 $SND2WAV_INSTALLATION_EXECUTABLE = null;
 /* set to true if you want to show the stack by linking in the xtalk templates from hypercardsimulator.com */
-$SHOW_PACKAGED_SOLO_STACK = true;
+$SHOW_PACKAGED_SOLO_STACK = false;
 /* for testing resources given a local STAK */
 $DEMO_DATAFORK_FILE = "";
 /* for testing resources given a local .rsrc */
@@ -172,6 +172,19 @@ function macroman($out)
 }
 	
 /* a few utility functions */
+function file_get_contents_LOCK(string $filename,
+    $use_include_path = false,
+    $context = null,
+    $offset = 0,
+    $length = null)
+{
+	$tmp = fopen($filename, 'rb');
+	@flock($tmp, LOCK_SH);
+	$contents = file_get_contents($filename, $use_include_path, $context, $offset, $length);
+	@flock($tmp, LOCK_UN);
+	fclose($tmp);
+	return $contents;
+}
 function decodeanddivify($str) 
 { 	
 	return Array('$'=>'div','$$'=>[macroman($str),Array('$'=>'br')]); 
@@ -184,9 +197,34 @@ function escapeshellarg_rewrite($arg)
 {
 	return "'" . str_replace("'", "'\\''", $arg) . "'";
 }
+/* Old archives can have weird file names that glob() won't even attempt to list so we fix with ls */
+function repair_current_directory_to_ASCII_filenames()
+{
+	$betterlist = shell_exec('ls 2>&1');
+	//print_r($betterlist);
+	foreach (explode("\n",$betterlist) as $num=>$bl)
+	{
+		if (empty($bl)) 
+			continue;
+		$newbl = preg_replace('/[\x00-\x1F\x7F-\xFF]/','?',$bl);
+		if ($newbl != $bl)
+		{
+			while (file_exists($newbl))
+				$newbl .= '?';
+			rename($bl, $newbl);
+		}
+		if (is_dir($newbl))
+		{
+			$cwd = getcwd();
+			chdir($newbl);
+			repair_current_directory_to_ASCII_filenames();
+			chdir($cwd);
+		}
+	}
+}
 function testforstackness($target_file)
 {
-	if (!file_exists($target_file) || file_get_contents($target_file, false, null, 4, 4) != 'STAK')
+	if (!file_exists($target_file) || file_get_contents_LOCK($target_file, false, null, 4, 4) != 'STAK')
 		return "<center><font color=red>That doesn't seem to be a HyperCard stack file.</font></center>";
 	
 	return "";
@@ -259,7 +297,7 @@ function read_STAK_file($filename, $target_srcname)
 	global $color_data;
 	global $XCMDs_stub_scripts;
 	
-	$contents = file_get_contents($filename);
+	$contents = file_get_contents_LOCK($filename);
 	if ($contents===false)
 	{
 		echo "Couldn't open stack file.";
@@ -754,7 +792,7 @@ function unpack_possible_resource_fork($possible_resource_fork, &$into_fork=null
 	if (!$possible_resource_fork)
 		return;
 	
-	if (!file_exists($possible_resource_fork) || ($contents=file_get_contents($possible_resource_fork))===false) 
+	if (!file_exists($possible_resource_fork) || ($contents=file_get_contents_LOCK($possible_resource_fork))===false) 
 	{
 		echo " No res fork found.";
 		return;
@@ -957,7 +995,7 @@ function unpack_possible_resource_fork($possible_resource_fork, &$into_fork=null
 			//echo "<br>";
 			if (isset($resourcedasm_folder) && file_exists($resourcedasm_folder.'/snd'.$snd['ID'].'.wav'))
 			{
-				$snd['wav'] = file_get_contents($resourcedasm_folder.'/snd'.$snd['ID'].'.wav');
+				$snd['wav'] = file_get_contents_LOCK($resourcedasm_folder.'/snd'.$snd['ID'].'.wav');
 				$wav_resources[$snd['name']] = "data:audio/wav;base64,".base64_encode($snd['wav']);
 			}
 			else if (isset($SND2WAV_INSTALLATION_EXECUTABLE))
@@ -971,7 +1009,7 @@ function unpack_possible_resource_fork($possible_resource_fork, &$into_fork=null
 				echo shell_exec($shellcmd);
 				echo "<BR>";
 				if (file_exists($sndfile.'_'.$snd['ID'].'.wav')) {
-					$snd['wav'] = file_get_contents($sndfile.'_'.$snd['ID'].'.wav');	// could make this the same file name too
+					$snd['wav'] = file_get_contents_LOCK($sndfile.'_'.$snd['ID'].'.wav');	// could make this the same file name too
 					$wav_resources[$snd['name']] = "data:audio/wav;base64,".base64_encode($snd['wav']);
 				}
 			}
@@ -1015,12 +1053,12 @@ function unpack_possible_resource_fork($possible_resource_fork, &$into_fork=null
 				}
 			if (isset($resourcedasm_folder) && file_exists($resourcedasm_folder.'/PICT'.$palette['PICT'].'.png'))
 				{
-					$palette['bitmap'] = 'data:image/png;base64,'.base64_encode(file_get_contents($resourcedasm_folder.'/PICT'.$palette['PICT'].'.png'));
+					$palette['bitmap'] = 'data:image/png;base64,'.base64_encode(file_get_contents_LOCK($resourcedasm_folder.'/PICT'.$palette['PICT'].'.png'));
 				}
 			else if (isset($resourcedasm_folder) && file_exists($resourcedasm_folder.'/PICT'.$palette['PLTE'].'.png'))
 				{
 					// try the PLTE id instead.
-					$palette['bitmap'] = 'data:image/png;base64,'.base64_encode(file_get_contents($resourcedasm_folder.'/PICT'.$palette['PLTE'].'.png'));
+					$palette['bitmap'] = 'data:image/png;base64,'.base64_encode(file_get_contents_LOCK($resourcedasm_folder.'/PICT'.$palette['PLTE'].'.png'));
 				}
 			
 			//print_r($palette);
@@ -1062,12 +1100,12 @@ function unpack_possible_resource_fork($possible_resource_fork, &$into_fork=null
 			$res = Array('name' => $pict['name']);
 			if (isset($resourcedasm_folder) && file_exists($resourcedasm_folder.'/PICT'.$pict['ID'].'.png'))
 			{
-				$res['bitmap'] = 'data:image/png;base64,'.base64_encode(file_get_contents($resourcedasm_folder.'/PICT'.$pict['ID'].'.png'));
+				$res['bitmap'] = 'data:image/png;base64,'.base64_encode(file_get_contents_LOCK($resourcedasm_folder.'/PICT'.$pict['ID'].'.png'));
 			}
 			else if (isset($resourcedasm_folder) && file_exists($resourcedasm_folder.'/PICT'.$pict['ID'].'.png'))
 			{
 				// try the PLTE id instead.
-				$res['bitmap'] = 'data:image/png;base64,'.base64_encode(file_get_contents($resourcedasm_folder.'/PICT'.$pict['ID'].'.png'));
+				$res['bitmap'] = 'data:image/png;base64,'.base64_encode(file_get_contents_LOCK($resourcedasm_folder.'/PICT'.$pict['ID'].'.png'));
 			}
 			$pict_resources[$pict['ID']] = $res;
 		}
@@ -1098,7 +1136,7 @@ function unpack_possible_resource_fork($possible_resource_fork, &$into_fork=null
 			if ($cursorfile)
 			{
 				$res = Array('name' => $curs['name'], 'x' => intval(explode("_",$cursorfile)[1]), 'y' => intval(explode("_",$cursorfile)[2]));
-				$res['bitmap'] = 'data:image/png;base64,'.base64_encode(file_get_contents($cursorfile));
+				$res['bitmap'] = 'data:image/png;base64,'.base64_encode(file_get_contents_LOCK($cursorfile));
 				$curs_resources[$curs['ID']] = $res;
 			}
 		}
@@ -1316,7 +1354,7 @@ function output_batch_interface()
 		$examine_archive_output = false;
 		
 		if (pathinfo($target_file,PATHINFO_EXTENSION) != 'hqx'
-			&& strpos(file_get_contents($target_file),"(This file must be converted with BinHex 4.0)") !== false
+			&& strpos(file_get_contents_LOCK($target_file),"(This file must be converted with BinHex 4.0)") !== false
 			&& rename($target_file,$target_file.'.hqx')===true
 			&& ($target_file=$target_file.'.hqx'))
 		{
@@ -1351,8 +1389,8 @@ function output_batch_interface()
 			
 			if (!is_dir($maconv_output_folder) || 0 == count(glob($maconv_output_folder.'/*')))
 			{
-				if (file_get_contents($target_file, false, null, 0, 4) == 'SIT!' || file_get_contents($target_file, false, null, 0, 2) == 'ST')
-					echo "Could not open it. (StuffIt v1 and v5 supported, this was v" . ord(file_get_contents($target_file, false, null, 14, 1)) . ")";
+				if (file_get_contents_LOCK($target_file, false, null, 0, 4) == 'SIT!' || file_get_contents_LOCK($target_file, false, null, 0, 2) == 'ST')
+					echo "Could not open it. (StuffIt v1 and v5 supported, this was v" . ord(file_get_contents_LOCK($target_file, false, null, 14, 1)) . ")";
 				else if (pathinfo($target_file,PATHINFO_EXTENSION)=='sit')
 					echo "Could not open it, despite being .SIT.";
 				else
@@ -1391,18 +1429,6 @@ function output_batch_interface()
 					{
 						$examine_archive_output = true;
 						echo " Unar success. ";
-						
-						// Unar makes funny named folders. glob cannot see a directory "directoryƒ" at all. LS can, so we use LS to fix some unar unstuff.
-						chdir($maconv_output_folder);
-						$betterlist = shell_exec('ls 2>&1');
-						//print_r(explode("\n",$betterlist));
-						foreach (explode("\n",$betterlist) as $num=>$bl)
-						{
-							//echo '{'.$bl.' '.is_dir($bl).'}';
-							if (is_dir($bl))
-								rename($bl, preg_replace('/[\x00-\x1F\x7F-\xFF]/','?',$bl)."_".$num);
-						}
-						chdir($cwd);
 					}
 				}
 			}
@@ -1411,30 +1437,29 @@ function output_batch_interface()
 				$examine_archive_output = true;
 			}
 		}
-
+		
 		if ($examine_archive_output)
 		{
+	
+			// archives can have some funny named folders. glob cannot see a directory "directoryƒ" at all. LS can, so we use LS to fix.
 			chdir($maconv_output_folder);
-			
-			// glob cannot see a directory "directoryƒ" at all. LS can, so we use LS to fix some unar unstuff.
-			/*$betterlist = shell_exec('ls 2>&1');
+			repair_current_directory_to_ASCII_filenames();
+		/*	$betterlist = shell_exec('ls 2>&1');
 			print_r(explode("\n",$betterlist));
 			foreach (explode("\n",$betterlist) as $num=>$bl)
 			{
-				echo '{'.$bl.' '.is_dir($bl).'}';
-				if (is_dir($bl))
-					rename($bl, preg_replace('/[\x00-\x1F\x7F-\xFF]/','?',$bl)."_".$num);
-			}
-			$betterlist = shell_exec('ls 2>&1');
-			print_r(explode("\n",$betterlist));*/
-			/*foreach (explode("\n",$betterlist) as $bl)
-			{
-				echo '{'.$bl.' '.is_dir($bl).'}';
-				if (is_dir($bl))
-					rename($bl, $bl."renamed");
-			}
-			print_r(glob('*',GLOB_NOSORT));	// glob doesn't see CW Battles DEMO� folder at all...I think that's a ƒ
-			*/
+				//echo '{'.$bl.' '.is_dir($bl).'}';
+				$newbl = preg_replace('/[\x00-\x1F\x7F-\xFF]/','?',$bl);
+				if ($newbl == $bl)
+					{}
+				else if (is_dir($bl))
+					rename($bl, $newbl."_".$num);
+				else
+					rename($bl, $newbl);
+			}*/
+			/*chdir($cwd);
+
+			chdir($maconv_output_folder);*/
 			
 			$firstlevel = rglob('*');
 			foreach ($firstlevel as $c)
@@ -1592,7 +1617,7 @@ if (!$filename && isset($_POST['convert']))
 	else if (!move_uploaded_file($_FILES["fileToUpload"]["tmp_name"], $target_file)) 
 		echo "<center><font color=red>Sorry, there was an error uploading your file.</font></center>";
 	else if (pathinfo($target_file,PATHINFO_EXTENSION) != 'hqx'
-		&& strpos(file_get_contents($target_file),"(This file must be converted with BinHex 4.0)") !== false
+		&& strpos(file_get_contents_LOCK($target_file),"(This file must be converted with BinHex 4.0)") !== false
 		&& rename($target_file,$target_file.'.hqx')===true
 		&& ($target_file=$target_file.'.hqx')
 		&& false)
@@ -1649,7 +1674,7 @@ if (!$filename && isset($_POST['convert']))
 				echo shell_exec($unar_command);
 				chdir($cwd);
 
-				if (is_dir($maconv_output_folder) && count(glob($maconv_output_folder.'/*')))
+				/*if (is_dir($maconv_output_folder) && count(glob($maconv_output_folder.'/*')))
 				{
 					// Unar makes funny named folders. glob cannot see a directory "directoryƒ" at all. LS can, so we use LS to fix some unar unstuff.
 					// also it tends to drop files in the current directory for some reason some problems.
@@ -1664,10 +1689,19 @@ if (!$filename && isset($_POST['convert']))
 							rename($bl, preg_replace('/[\x00-\x1F\x7F-\xFF]/','?',$bl)."".$num);
 					}
 					chdir($cwd);
-				}
+				}*/
 			}
 		}
 
+		if (is_dir($maconv_output_folder))
+		{
+			// archives can have some funny named folders. glob cannot see a directory "directoryƒ" at all. LS can, so we use LS to fix.
+			$cwd = getcwd();
+			chdir($maconv_output_folder);
+			repair_current_directory_to_ASCII_filenames();
+			chdir($cwd);
+		}
+		
 		echo "</pre>\n";
 
 		if (!is_dir($maconv_output_folder) || 0 == count(glob($maconv_output_folder.'/*')))
